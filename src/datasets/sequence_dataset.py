@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 from torch.utils.data import Dataset
 from typing import List, Optional, Callable
@@ -71,6 +72,6 @@ class SequenceDataset(Dataset):
             )
 
         sample_paths = selected_sample_paths[idx : idx + self.sequence_length]
-        samples = [np.load(sample_path) for sample_path in sample_paths]
+        samples = [pickle.load(open(sample_path, "rb")) for sample_path in sample_paths]
 
         return samples

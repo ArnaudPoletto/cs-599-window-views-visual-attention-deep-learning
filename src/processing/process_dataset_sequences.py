@@ -7,11 +7,13 @@ sys.path.append(str(GLOBAL_DIR))
 import os
 import cv2
 import shutil
+import pickle
 import argparse
 import numpy as np
 from tqdm import tqdm
-from typing import List
+from typing import List, Optional
 
+from src.utils.sample import Sample
 from src.utils.file import get_files_recursive, get_ids_from_file_path, get_set_str
 from src.config import SAMPLES_PATH, SETS_PATH
 
@@ -27,7 +29,8 @@ def process_sample(
     scene_id: int,
     start_frame: int,
     end_frame: int,
-    sample: List[np.ndarray],
+    image_series: List[np.ndarray],
+    next_image: Optional[np.ndarray] = None,
 ) -> None:
     """
     Process the given sample.
@@ -38,14 +41,16 @@ def process_sample(
         scene_id (int): The scene ID.
         start_frame (int): The start frame.
         end_frame (int): The end frame.
-        sample (List[np.ndarray]): The sample frames.
+        image_series (List[np.ndarray]): The image series.
+        next_image (np.ndarray, optional): The next image. Defaults to None.
     """
-    sample = np.array(sample)
+    sample = Sample(image_series=image_series, next_image=next_image)
     set_str = get_set_str(experiment_id, set_id)
-    sample_path = f"{SAMPLES_PATH}/experiment{experiment_id}/{set_str}/scene{scene_id:02}/{start_frame}-{end_frame}.npy"
+    sample_path = f"{SAMPLES_PATH}/experiment{experiment_id}/{set_str}/scene{scene_id:02}/{start_frame}-{end_frame}.pkl"
 
     os.makedirs(os.path.dirname(sample_path), exist_ok=True)
-    np.save(sample_path, sample)
+    with open(sample_path, "wb") as f:
+        pickle.dump(sample, f)
 
 
 def process_video_samples(
@@ -98,7 +103,7 @@ def process_video_samples(
 
     # Iterate over frames
     experiment_id, set_id, scene_id = get_ids_from_file_path(video_path)
-    curr_sample = []
+    image_series = []
     curr_frame_id = video_start_frame
     while True:
         # Read frame
@@ -116,21 +121,35 @@ def process_video_samples(
             curr_frame_id += 1
             continue
 
-        curr_sample.append(frame)
+        image_series.append(frame)
 
-        # Process sample if it is complete
-        if len(curr_sample) == sample_length:
+        # Check if the sample length has been reached
+        if len(image_series) == sample_length:
+            # Peek at the next frame to set as flow image
+            curr_pos = video.get(cv2.CAP_PROP_POS_FRAMES)
+            next_pos = curr_pos + frame_step - 1
+            video.set(cv2.CAP_PROP_POS_FRAMES, next_pos)
+            ret, next_frame = video.read()
+            if ret:
+                next_image = next_frame
+                video.set(cv2.CAP_PROP_POS_FRAMES, curr_pos)
+            else:
+                next_image = None
+
+            # Process the sample
             process_sample(
                 experiment_id=experiment_id,
                 set_id=set_id,
                 scene_id=scene_id,
                 start_frame=curr_frame_id - (sample_length - 1) * sample_fps,
                 end_frame=curr_frame_id + sample_fps,
-                sample=curr_sample,
+                image_series=image_series,
+                next_image=next_image,
             )
-            curr_sample = []
+            image_series = []
 
         curr_frame_id += 1
+
 
 def parse_arguments() -> argparse.Namespace:
     """
@@ -167,6 +186,7 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
 
 def main():
     # Parse arguments
