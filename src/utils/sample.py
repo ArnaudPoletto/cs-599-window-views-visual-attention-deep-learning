@@ -9,23 +9,32 @@ class Sample:
 
     def __init__(
         self,
-        image_series: List[np.ndarray],
-        next_image: Optional[np.ndarray],
+        frames: List[np.ndarray],
+        next_frame: Optional[np.ndarray],
         ground_truth: np.ndarray,
     ) -> None:
         """
         Initialize the sample.
 
         Args:
-            image_series (List[np.ndarray]): The series of images.
-            next_image (Optional[np.ndarray]): The next image, i.e. the successor of the last image in the series. If None, the last image in the series is considered the last image in the sequence.
+            frames (List[np.ndarray]): The frames.
+            next_frame (Optional[np.ndarray]): The next image, i.e. the successor of the last frame. If None, it is considered as the last frame.
             ground_truth (np.ndarray): The ground truth.
+
+        Raises:
+            ValueError: If the shapes of the images in the series are not the same.
+            ValueError: If the shape of the next frame is not the same as the shape of the last image in the series.
         """
-        self.image_series = image_series
-        self.next_image = (
-            next_image if next_image is not None else image_series[-1].copy()
-        )
-        self.ground_truth = ground_truth
+        if not all(frame.shape == frames[0].shape for frame in frames):
+            raise ValueError("❌ All np.ndarrays in frames must have the same shape.")
+        if next_frame is not None and next_frame.shape != frames[0].shape:
+            raise ValueError(
+                "❌ The shape of next_frame must be the same as the shape of the last image in frames."
+            )
+
+        self.frames = np.array(frames).astype(np.uint8)
+        self.next_frame = next_frame if next_frame is not None else frames[-1].copy()
+        self.ground_truth = ground_truth.astype(np.float32)
 
     def __len__(self) -> int:
         """
@@ -34,7 +43,7 @@ class Sample:
         Returns:
             int: The length of the sample.
         """
-        return len(self.image_series)
+        return self.frames.shape[0]
 
     def __repr__(self) -> str:
         """
@@ -43,11 +52,11 @@ class Sample:
         Returns:
             str: The string representation of the sample.
         """
-        repr = f"Sample(image_series_shapes={[image_element.shape for image_element in self.image_series]}"
-        if self.next_image is None:
-            repr += ", next_image=None"
+        repr = f"Sample(frames_shapes={self.frames[0].shape}"
+        if self.next_frame is None:
+            repr += ", next_frame=None"
         else:
-            repr += f", next_image={self.next_image.shape}"
+            repr += f", next_frame_shape={self.next_frame.shape}"
         repr += f", ground_truth_shape={self.ground_truth.shape})"
 
         return repr

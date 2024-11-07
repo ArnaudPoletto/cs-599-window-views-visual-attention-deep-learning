@@ -41,8 +41,8 @@ def process_sample(
     scene_id: int,
     start_frame: int,
     end_frame: int,
-    image_series: List[np.ndarray],
-    next_image: Optional[np.ndarray],
+    frames: List[np.ndarray],
+    next_frame: Optional[np.ndarray],
     ground_truth: SampleGroundTruth,
 ) -> None:
     """
@@ -54,12 +54,12 @@ def process_sample(
         scene_id (int): The scene ID.
         start_frame (int): The start frame.
         end_frame (int): The end frame.
-        image_series (List[np.ndarray]): The image series.
-        next_image (np.ndarray): The next image.
+        frames (List[np.ndarray]): The frames.
+        next_frame (np.ndarray): The next frame.
         ground_truth (np.ndarray): The ground truth.
     """
     sample = Sample(
-        image_series=image_series, next_image=next_image, ground_truth=ground_truth
+        frames=frames, next_frame=next_frame, ground_truth=ground_truth
     )
     set_str = get_set_str(experiment_id, set_id)
     sample_path = f"{SAMPLES_PATH}/experiment{experiment_id}/{set_str}/scene{scene_id:02}/{start_frame}-{end_frame}.pkl"
@@ -69,7 +69,7 @@ def process_sample(
         pickle.dump(sample, f)
 
 
-def get_sample_next_image(
+def get_sample_next_frame(
     video: cv2.VideoCapture, frame_step: int
 ) -> Optional[np.ndarray]:
     """
@@ -87,12 +87,12 @@ def get_sample_next_image(
     video.set(cv2.CAP_PROP_POS_FRAMES, next_pos)
     ret, next_frame = video.read()
     if ret:
-        next_image = next_frame
+        next_frame = next_frame
         video.set(cv2.CAP_PROP_POS_FRAMES, curr_pos)
     else:
-        next_image = None
+        next_frame = None
 
-    return next_image
+    return next_frame
 
 
 def get_sample_ground_truth(
@@ -214,7 +214,7 @@ def process_video_samples(
 
     # Iterate over frames
     experiment_id, set_id, scene_id = get_ids_from_file_path(video_path)
-    image_series = []
+    frames = []
     curr_frame_id = video_start_frame
     while True:
         # Read frame
@@ -232,15 +232,15 @@ def process_video_samples(
             curr_frame_id += 1
             continue
 
-        image_series.append(frame)
+        frames.append(frame)
 
         # Check if the sample length has been reached
-        if len(image_series) == sample_length:
+        if len(frames) == sample_length:
             start_frame = curr_frame_id - (sample_length - 1) * sample_fps
             end_frame = curr_frame_id
 
             # Get next image and ground truth
-            next_image = get_sample_next_image(video=video, frame_step=frame_step)
+            next_frame = get_sample_next_frame(video=video, frame_step=frame_step)
             ground_truth = get_sample_ground_truth(
                 fixation_data=fixation_data,
                 experiment_id=experiment_id,
@@ -260,11 +260,11 @@ def process_video_samples(
                 scene_id=scene_id,
                 start_frame=start_frame,
                 end_frame=end_frame,
-                image_series=image_series,
-                next_image=next_image,
+                frames=frames,
+                next_frame=next_frame,
                 ground_truth=ground_truth,
             )
-            image_series = []
+            frames = []
 
         curr_frame_id += 1
 

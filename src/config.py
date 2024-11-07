@@ -4,11 +4,14 @@ from pathlib import Path
 GLOBAL_DIR = Path(__file__).parent / ".."
 sys.path.append(str(GLOBAL_DIR))
 
+import torch
+
 DATA_PATH = str(GLOBAL_DIR / "data")
 GAZE_PATH = f"{DATA_PATH}/gaze"
 SETS_PATH = f"{DATA_PATH}/sets"
 SAMPLES_PATH = f"{DATA_PATH}/samples"
 GROUND_TRUTHS_PATH = f"{DATA_PATH}/ground_truths"
+MODELS_PATH = f"{DATA_PATH}/models"
 
 FIXATION_DATA_PATH = f"{GAZE_PATH}/fixation_data.csv"
 
@@ -24,3 +27,6 @@ RAW_GAZE_FRAME_WIDTH = 6144
 RAW_GAZE_FRAME_HEIGHT = 3072
 IMAGE_WIDTH = 2396
 IMAGE_HEIGHT = 860
+
+SEED = 0
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
