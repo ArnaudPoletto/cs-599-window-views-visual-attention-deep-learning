@@ -1,15 +1,20 @@
+import sys
+from pathlib import Path
+
+GLOBAL_DIR = Path(__file__).parent / ".." / ".."
+sys.path.append(str(GLOBAL_DIR))
+
 import cv2
 import pickle
+import random
 import numpy as np
-from typing import List
+from typing import List, Tuple
 import albumentations as A
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
-from torch.utils.data import random_split
+from torch.utils.data import Dataset, DataLoader
 
-from src.utils.sample import Sample
+from src.utils.random import set_seed
 from src.utils.sequence import Sequence
-from src.config import IMAGE_WIDTH, IMAGE_HEIGHT
+from src.config import SEED
 
 
 class SequenceDataset(Dataset):
@@ -30,6 +35,7 @@ class SequenceDataset(Dataset):
         Raises:
             ValueError: If the sequence length is invalid.
         """
+        super(SequenceDataset, self).__init__()
         if sequence_length <= 0:
             raise ValueError("❌The sequence length must be greater than 0.")
 
@@ -39,7 +45,6 @@ class SequenceDataset(Dataset):
         self.all_transforms = (
             A.ReplayCompose(
                 [
-                    A.Resize(width=331, height=331),
                     A.HorizontalFlip(p=0.5),
                     A.Rotate(limit=15, border_mode=cv2.BORDER_CONSTANT, p=0.5),
                 ]
@@ -54,7 +59,6 @@ class SequenceDataset(Dataset):
                         brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05, p=0.8
                     ),
                     A.GaussianBlur(blur_limit=(3, 3), sigma_limit=(0.1, 0.5), p=0.5),
-                    A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
                 ]
             )
             if with_transforms
@@ -83,7 +87,7 @@ class SequenceDataset(Dataset):
             ]
         )
 
-    def apply_transforms(self, sequence: Sequence) -> Sequence:
+    def _apply_transforms(self, sequence: Sequence) -> Sequence:
         """
         Apply transforms to the samples.
 
@@ -94,11 +98,13 @@ class SequenceDataset(Dataset):
             Sequence: The transformed sequence.
         """
         # Get transforms to replay
-        frame = sequence.get_frames()[0][0]
-        input_transform_replay = self.input_transforms(image=frame)
-        all_replayed_transforms = self.all_transforms(image=frame)
-        all_transform_replay = all_replayed_transforms["replay"]
-        input_transform_replay = input_transform_replay["replay"]
+        if self.with_transforms:
+            frame = sequence.get_frames()[0][0]
+            input_transform_replay = self.input_transforms(image=frame)["replay"]
+            all_transform_replay = self.all_transforms(image=frame)["replay"]
+
+        resize = A.Resize(width=331, height=331)
+        normalize = A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
 
         # Apply the stored replay to all images
         transformed_frames = []
@@ -106,8 +112,15 @@ class SequenceDataset(Dataset):
         frames_shape = frames.shape
         frames = frames.reshape(-1, *frames_shape[2:])
         for frame in frames:
-            frame = A.ReplayCompose.replay(all_transform_replay, image=frame)["image"]
-            frame = A.ReplayCompose.replay(input_transform_replay, image=frame)["image"]
+            frame = resize(image=frame)["image"]
+            if self.with_transforms:
+                frame = A.ReplayCompose.replay(all_transform_replay, image=frame)[
+                    "image"
+                ]
+                frame = A.ReplayCompose.replay(input_transform_replay, image=frame)[
+                    "image"
+                ]
+            frame = normalize(image=frame)["image"]
             transformed_frames.append(frame)
         transformed_frames = np.array(transformed_frames).reshape(
             frames_shape[:2] + transformed_frames[0].shape
@@ -117,22 +130,27 @@ class SequenceDataset(Dataset):
         transformed_next_frames = []
         next_frames = sequence.get_next_frames()
         for next_frame in next_frames:
-            next_frame = A.ReplayCompose.replay(all_transform_replay, image=next_frame)[
-                "image"
-            ]
-            next_frame = A.ReplayCompose.replay(
-                input_transform_replay, image=next_frame
-            )["image"]
+            next_frame = resize(image=next_frame)["image"]
+            if self.with_transforms:
+                next_frame = A.ReplayCompose.replay(
+                    all_transform_replay, image=next_frame
+                )["image"]
+                next_frame = A.ReplayCompose.replay(
+                    input_transform_replay, image=next_frame
+                )["image"]
+            next_frame = normalize(image=next_frame)["image"]
             transformed_next_frames.append(next_frame)
         transformed_next_frames = np.array(transformed_next_frames)
         sequence.set_next_frames(transformed_next_frames)
 
         transformed_ground_truths = []
         ground_truths = sequence.get_ground_truths()
-        for ground_truth in sequence.get_ground_truths():
-            ground_truth = A.ReplayCompose.replay(
-                all_transform_replay, image=ground_truth
-            )["image"]
+        for ground_truth in ground_truths:
+            ground_truth = resize(image=ground_truth)["image"]
+            if self.with_transforms:
+                ground_truth = A.ReplayCompose.replay(
+                    all_transform_replay, image=ground_truth
+                )["image"]
             transformed_ground_truths.append(ground_truth)
         transformed_ground_truths = np.array(transformed_ground_truths)
         sequence.set_ground_truths(transformed_ground_truths)
@@ -166,17 +184,16 @@ class SequenceDataset(Dataset):
         samples = [pickle.load(open(sample_path, "rb")) for sample_path in sample_paths]
         sequence = Sequence(samples)
 
-        if self.with_transforms:
-            sequence = self.apply_transforms(sequence)
-
+        sequence = self._apply_transforms(sequence)
 
         frames = sequence.get_frames()
-        frames = np.moveaxis(frames, -1, 2) # Place channel axis at the beginning
+        frames = np.moveaxis(frames, -1, 2)  # Place channel axis at the beginning
         ground_truths = sequence.get_ground_truths()
         global_ground_truth = sequence.get_global_ground_truth()
 
         return frames, ground_truths, global_ground_truth
-    
+
+
 def get_dataloaders(
     sample_paths_list: List[List[str]],
     sequence_length: int,
@@ -187,27 +204,74 @@ def get_dataloaders(
     test_split: float,
     train_shuffle: bool,
     n_workers: int,
-) -> tuple[DataLoader, DataLoader, DataLoader]:
+    seed: int = SEED,
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    # Check if the splits are valid
     if not np.isclose(train_split + val_split + test_split, 1.0):
         raise ValueError(
             "❌ The sum of the train, validation, and test splits must be equal to 1."
         )
-    
-    dataset = SequenceDataset(
-        sample_paths_list=sample_paths_list,
+
+    # Check if we have enough scenes for the requested split
+    num_scenes = len(sample_paths_list)
+    if num_scenes < 3:
+        raise ValueError(
+            f"❌ Not enough scenes ({num_scenes}) to split into train, validation, and test sets. "
+            "Need at least 3 scenes."
+        )
+
+    if seed is not None:
+        print(f"🌱 Setting the seed to {seed} for generating dataloaders")
+        set_seed(seed)
+
+    scene_indices = list(range(num_scenes))
+    random.shuffle(scene_indices)
+
+    # Calculate initial split sizes
+    val_scenes = max(1, int(val_split * num_scenes))
+    test_scenes = max(1, int(test_split * num_scenes))
+    train_scenes = num_scenes - val_scenes - test_scenes
+
+    # Check if we have enough scenes for the requested split
+    if train_scenes < 1:
+        raise ValueError(
+            "❌ Not enough scenes to maintain at least one scene for training"
+        )
+
+    train_scene_indices = scene_indices[:train_scenes]
+    val_scene_indices = scene_indices[train_scenes : train_scenes + val_scenes]
+    test_scene_indices = scene_indices[train_scenes + val_scenes :]
+
+    # Create flattened lists of samples for each split while tracking scene boundaries
+    train_samples = []
+    val_samples = []
+    test_samples = []
+    for idx, scene_samples in enumerate(sample_paths_list):
+        if idx in train_scene_indices:
+            train_samples.append(scene_samples)
+        elif idx in val_scene_indices:
+            val_samples.append(scene_samples)
+        elif idx in test_scene_indices:
+            test_samples.append(scene_samples)
+
+    # Create separate datasets
+    train_dataset = SequenceDataset(
+        sample_paths_list=train_samples,
         sequence_length=sequence_length,
         with_transforms=with_transforms,
     )
-
-    total_length = len(dataset)
-    train_length = int(train_split * total_length)
-    val_length = int(val_split * total_length)
-    test_length = total_length - train_length - val_length
-
-    train_dataset, val_dataset, test_dataset = random_split(
-        dataset, [train_length, val_length, test_length]
+    val_dataset = SequenceDataset(
+        sample_paths_list=val_samples,
+        sequence_length=sequence_length,
+        with_transforms=False,
+    )
+    test_dataset = SequenceDataset(
+        sample_paths_list=test_samples,
+        sequence_length=sequence_length,
+        with_transforms=False,
     )
 
+    # Create dataloaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -228,6 +292,10 @@ def get_dataloaders(
         shuffle=False,
         num_workers=n_workers,
         pin_memory=True,
+    )
+
+    print(
+        f"✅ Created dataloaders with {len(train_loader)} training, {len(val_loader)} validation, and {len(test_loader)} test batches."
     )
 
     return train_loader, val_loader, test_loader

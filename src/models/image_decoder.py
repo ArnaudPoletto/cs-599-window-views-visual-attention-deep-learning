@@ -9,90 +9,104 @@ from torch import nn
 
 
 class ImageDecoder(nn.Module):
-    def __init__(
-        self,
-    ):
+    def __init__(self):
         super(ImageDecoder, self).__init__()
 
-        self.upconv4 = nn.ConvTranspose2d(
-            in_channels=4320,
-            out_channels=2160,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            output_padding=0,
-        )
-        self.conv4 = nn.Conv2d(
-            in_channels=2160 + 2160, out_channels=2160, kernel_size=3, padding=1
+        self.deconv_layer0 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=4320, out_channels=512, kernel_size=3, padding=1, bias=True
+            ),
+            nn.ReLU(inplace=True),
+            nn.Upsample(size=(21, 21), mode="bilinear", align_corners=False),
         )
 
-        self.upconv3 = nn.ConvTranspose2d(
-            in_channels=2160,
-            out_channels=1080,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            output_padding=1,
-        )
-        self.conv3 = nn.Conv2d(
-            in_channels=1080 + 1080, out_channels=1080, kernel_size=3, padding=1
-        )
-
-        self.upconv2 = nn.ConvTranspose2d(
-            in_channels=1080,
-            out_channels=270,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            output_padding=0,
-        )
-        self.conv2 = nn.Conv2d(
-            in_channels=270 + 270, out_channels=270, kernel_size=3, padding=1
+        self.deconv_layer1 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=512 + 2160,
+                out_channels=256,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            ),
+            nn.ReLU(inplace=True),
+            nn.Upsample(size=(42, 42), mode="bilinear", align_corners=False),
         )
 
-        self.upconv1 = nn.ConvTranspose2d(
-            in_channels=270,
-            out_channels=96,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            output_padding=0,
-        )
-        self.conv1 = nn.Conv2d(
-            in_channels=96 + 96, out_channels=32, kernel_size=3, padding=1
-        )
-
-        self.final_upconv = nn.ConvTranspose2d(
-            in_channels=32,
-            out_channels=1,
-            kernel_size=3,
-            stride=2,
-            padding=0,
-            output_padding=0,
+        self.deconv_layer2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=1080 + 256,
+                out_channels=270,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            ),
+            nn.ReLU(inplace=True),
+            nn.Upsample(size=(83, 83), mode="bilinear", align_corners=False),
         )
 
-        self.relu = nn.ReLU(inplace=True)
-        self.sigmoid = nn.Sigmoid()
+        self.deconv_layer3 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=540, 
+                out_channels=96, 
+                kernel_size=3, 
+                padding=1, 
+                bias=True,
+            ),
+            nn.ReLU(inplace=True),
+            nn.Upsample(size=(165, 165), mode="bilinear", align_corners=False),
+        )
+
+        self.deconv_layer4 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=192, 
+                out_channels=128, 
+                kernel_size=3, 
+                padding=1, 
+                bias=True,
+            ),
+            nn.ReLU(inplace=True),
+            nn.Upsample(size=(331, 331), mode="bilinear", align_corners=False),
+        )
+
+        self.deconv_layer5 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=128, 
+                out_channels=128, 
+                kernel_size=3, 
+                padding=1, 
+                bias=True,
+            ),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=128, 
+                out_channels=1, 
+                kernel_size=3, 
+                padding=1, 
+                bias=True,
+            ),
+            nn.Sigmoid(),
+        )
 
     def forward(self, features):
-        x = self.relu(self.upconv4(features[-1]))
-        x = torch.cat((x, features[-2]), dim=1)
-        x = self.relu(self.conv4(x))
+        out5 = features[-1]
+        out4 = features[-2]
+        out3 = features[-3]
+        out2 = features[-4]
+        out1 = features[-5]
 
-        x = self.relu(self.upconv3(x))
-        x = torch.cat((x, features[-3]), dim=1)
-        x = self.relu(self.conv3(x))
+        x = self.deconv_layer0(out5)
 
-        x = self.relu(self.upconv2(x))
-        x = torch.cat((x, features[-4]), dim=1)
-        x = self.relu(self.conv2(x))
+        x = torch.cat((x, out4), 1)
+        x = self.deconv_layer1(x)
 
-        x = self.relu(self.upconv1(x))
-        x = torch.cat((x, features[-5]), dim=1)
-        x = self.relu(self.conv1(x))
+        x = torch.cat((x, out3), 1)
+        x = self.deconv_layer2(x)
 
-        x = self.final_upconv(x)
+        x = torch.cat((x, out2), 1)
+        x = self.deconv_layer3(x)
+        x = torch.cat((x, out1), 1)
+        x = self.deconv_layer4(x)
 
-        x = self.sigmoid(x)
+        x = self.deconv_layer5(x)
 
-        return x
+        return x.squeeze(1)

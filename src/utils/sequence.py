@@ -71,12 +71,15 @@ class Sequence:
             frames (np.nparray): The frames to set.
 
         Raises:
-            ValueError: If the number of frames does not match the number of samples in the sequence.
-            ValueError: If the number of frames does not match the sample length.
+            ValueError: If the frames are not of shape (sequence_length, sample_length, height, width).
+            ValueError: If the first dimension of the frames does not match the sequence length.
+            ValueError: If the second dimension of the frames does not match the sample length.
         """
+        if len(frames.shape) != 4:
+            raise ValueError("❌ The frames must be of shape (sequence_length, sample_length, height, width).")
         if frames.shape[0] != len(self.sequence):
             raise ValueError(
-                "❌ The number of frames must match the number of samples in the sequence."
+                "❌ The number of frames must match the sequence length."
             )
         if frames.shape[1] != self.sample_length:
             raise ValueError("❌ The number of frames must match the sample length.")
@@ -103,11 +106,14 @@ class Sequence:
             next_frames (np.ndarray): The next images to set.
 
         Raises:
-            ValueError: If the number of next frames does not match the number of samples in the sequence.
+            ValueError: If the next frames are not of shape (sequence_length, height, width).
+            ValueError: If the number of next frames does not match the sequence length.
         """
+        if len(next_frames.shape) != 3:
+            raise ValueError("❌ The next frames must be of shape (sequence_length, height, width).")
         if len(next_frames) != len(self.sequence):
             raise ValueError(
-                "❌ The number of next frames must match the number of samples in the sequence."
+                "❌ The number of next frames must match the sequence length."
             )
 
         for sample, next_frame in zip(self.sequence, next_frames):
@@ -134,11 +140,14 @@ class Sequence:
             ground_truths (np.ndarray): The ground truths to set.
 
         Raises:
-            ValueError: If the number of ground truths does not match the number of samples in the sequence.
+            ValueError: If the ground truths are not of shape (sequence_length, height, width).
+            ValueError: If the number of ground truths does not match the sequence length.
         """
-        if len(ground_truths) != len(self.sequence):
+        if len(ground_truths.shape) != 3:
+            raise ValueError("❌ The ground truths must be of shape (sequence_length, height, width).")
+        if ground_truths.shape[0] != len(self.sequence):
             raise ValueError(
-                "❌ The number of ground truths must match the number of samples in the sequence, got {len(ground_truths)} ground truths and {len(self.sequence)} samples."
+                "❌ The number of ground truths must match the sequence length."
             )
 
         for sample, ground_truth in zip(self.sequence, ground_truths):

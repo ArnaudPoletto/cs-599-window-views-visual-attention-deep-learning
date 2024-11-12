@@ -15,24 +15,27 @@ from tqdm import tqdm
 from typing import List, Optional
 from scipy.stats import gaussian_kde
 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 from src.utils.sample_ground_truth import SampleGroundTruth
 from src.utils.sample import Sample
-from src.utils.file import get_files_recursive, get_ids_from_file_path, get_set_str
+from src.utils.file import get_paths_recursive, get_ids_from_file_path, get_set_str
 from src.config import (
-    FPS,
     SETS_PATH,
     SAMPLES_PATH,
     FIXATION_DATA_PATH,
-    RAW_GAZE_FRAME_WIDTH,
-    RAW_GAZE_FRAME_HEIGHT,
-    DEFAULT_DATASET_SAMPLE_FPS,
-    DEFAULT_DATASET_SAMPLE_LENGTH,
-    DEFAULT_DATASET_VIDEO_STOP_SEC,
-    DEFAULT_DATASET_VIDEO_START_SEC,
-    DEFAULT_DATASET_GROUND_TRUTH_KDE_BANDWIDTH,
 )
 
+FPS = 25
 N_NSEC_IN_SEC = 1e9
+MIN_N_FIXATIONS = 5
+RAW_GAZE_FRAME_WIDTH = 6144
+RAW_GAZE_FRAME_HEIGHT = 3072
+DEFAULT_DATASET_SAMPLE_FPS = 2
+DEFAULT_DATASET_SAMPLE_LENGTH = 2
+DEFAULT_DATASET_VIDEO_STOP_SEC = 60
+DEFAULT_DATASET_VIDEO_START_SEC = 5
+DEFAULT_DATASET_GROUND_TRUTH_KDE_BANDWIDTH = 0.4
 
 
 def process_sample(
@@ -58,9 +61,7 @@ def process_sample(
         next_frame (np.ndarray): The next frame.
         ground_truth (np.ndarray): The ground truth.
     """
-    sample = Sample(
-        frames=frames, next_frame=next_frame, ground_truth=ground_truth
-    )
+    sample = Sample(frames=frames, next_frame=next_frame, ground_truth=ground_truth)
     set_str = get_set_str(experiment_id, set_id)
     sample_path = f"{SAMPLES_PATH}/experiment{experiment_id}/{set_str}/scene{scene_id:02}/{start_frame}-{end_frame}.pkl"
 
@@ -105,10 +106,11 @@ def get_sample_ground_truth(
     width: int,
     height: int,
     kde_bandwidth: float,
+    min_n_fixations: int = MIN_N_FIXATIONS,
 ) -> SampleGroundTruth:
     """
     Get the ground truth for the sample.
-    
+
     Args:
         fixation_data (pd.DataFrame): The fixation data.
         experiment_id (int): The experiment ID.
@@ -119,6 +121,7 @@ def get_sample_ground_truth(
         width (int): The width of the images.
         height (int): The height of the images.
         kde_bandwidth (float): The bandwidth for the kernel density estimation.
+        min_n_fixations (int): The minimum number of fixations required to generate a saliency map.
     """
     fixation_data = fixation_data.copy()
     # Filter out fixations not from the current scene
@@ -143,9 +146,9 @@ def get_sample_ground_truth(
     y_coords = fixation_data["Y_px"].values
 
     # Return an empty saliency map if no fixations are present
-    if len(x_coords) == 0 or len(y_coords) == 0:
+    if len(x_coords) < min_n_fixations or len(y_coords) < min_n_fixations:
         return np.zeros((height, width))
-    
+
     # Perform kernel density estimation
     positions = np.vstack([x_coords, y_coords])
     kde = gaussian_kde(positions, bw_method=kde_bandwidth)
@@ -159,6 +162,7 @@ def get_sample_ground_truth(
     )
 
     return saliency_map
+
 
 def process_video_samples(
     video_path: str,
@@ -186,7 +190,6 @@ def process_video_samples(
         ValueError: If the maximum stop time is less than or equal to the minimum start time.
         ValueError: If the sample FPS is less than or equal to 0.
         ValueError: If the sample FPS is greater than the video FPS.
-        ValueError: If the sample FPS is not a factor of the video FPS.
     """
     if video_start_sec < 0:
         raise ValueError("❌ Minimum start time must be greater than or equal to 0.")
@@ -202,10 +205,6 @@ def process_video_samples(
     fps = video.get(cv2.CAP_PROP_FPS)
     if sample_fps > fps:
         raise ValueError("❌ Sample FPS must be less than the video FPS.")
-    if fps % sample_fps != 0:
-        raise ValueError(
-            f"❌ Sample FPS must be a factor of the video FPS: current FPS = {fps}, sample FPS = {sample_fps}"
-        )
     frame_step = int(fps / sample_fps)
 
     # Set video start frame
@@ -216,6 +215,7 @@ def process_video_samples(
     experiment_id, set_id, scene_id = get_ids_from_file_path(video_path)
     frames = []
     curr_frame_id = video_start_frame
+    start_frame = video_start_frame
     while True:
         # Read frame
         ret, frame = video.read()
@@ -236,9 +236,6 @@ def process_video_samples(
 
         # Check if the sample length has been reached
         if len(frames) == sample_length:
-            start_frame = curr_frame_id - (sample_length - 1) * sample_fps
-            end_frame = curr_frame_id
-
             # Get next image and ground truth
             next_frame = get_sample_next_frame(video=video, frame_step=frame_step)
             ground_truth = get_sample_ground_truth(
@@ -247,7 +244,7 @@ def process_video_samples(
                 set_id=set_id,
                 scene_id=scene_id,
                 start_frame=start_frame,
-                end_frame=end_frame,
+                end_frame=curr_frame_id,
                 width=frame.shape[1],
                 height=frame.shape[0],
                 kde_bandwidth=kde_bandwidth,
@@ -259,12 +256,13 @@ def process_video_samples(
                 set_id=set_id,
                 scene_id=scene_id,
                 start_frame=start_frame,
-                end_frame=end_frame,
+                end_frame=curr_frame_id,
                 frames=frames,
                 next_frame=next_frame,
                 ground_truth=ground_truth,
             )
             frames = []
+            start_frame = curr_frame_id
 
         curr_frame_id += 1
 
@@ -333,9 +331,8 @@ def main():
         print("✅ Deleted existing samples.")
 
     # Get video paths
-    video_paths = get_files_recursive(
-        folder_path=SETS_PATH,
-        match_pattern="*.mp4",
+    video_paths = get_paths_recursive(
+        folder_path=SETS_PATH, match_pattern="*.mp4", file_type="f"
     )
 
     # Get and fixation data

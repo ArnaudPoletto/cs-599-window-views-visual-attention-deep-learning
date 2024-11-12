@@ -174,6 +174,8 @@ class Trainer(ABC):
         print(
             f"🚀 Training {self.__class__.__name__} method for {num_epochs} epochs..."
         )
+        # model number traininable
+        print(f"🔧 Model has {sum(p.numel() for p in self.model.parameters() if p.requires_grad):,} trainable parameters")
 
         # Scaler
         scaler = GradScaler(enabled=self.use_scaler)

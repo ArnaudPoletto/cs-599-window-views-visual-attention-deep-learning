@@ -42,14 +42,11 @@ class UNetTrainer(Trainer):
         ground_truths = ground_truths.float().to(DEVICE)
         global_ground_truth = global_ground_truth.float().to(DEVICE)
 
-        # TODO: for now, only taking the first frame of the whole sequence
-        frame = frames[:, 0, 0, :, :, :]
-
         # Forward pass
         with autocast(enabled=self.use_scaler):
-            outputs = self.model(frame).squeeze(1)
+            outputs = self.model(frames).squeeze(1)
 
-        loss = self.criterion(outputs, global_ground_truth)
+        loss = self.criterion(outputs, ground_truths)
 
         # Compute loss
         return loss, None, None # TODO: return None for now
