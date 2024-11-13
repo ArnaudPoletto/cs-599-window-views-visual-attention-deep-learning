@@ -9,7 +9,7 @@ from torch import nn
 
 
 class ImageDecoder(nn.Module):
-    def __init__(self):
+    def __init__(self, output_channels: int) -> None:
         super(ImageDecoder, self).__init__()
 
         self.deconv_layer0 = nn.Sequential(
@@ -79,7 +79,7 @@ class ImageDecoder(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channels=128, 
-                out_channels=1, 
+                out_channels=output_channels, 
                 kernel_size=3, 
                 padding=1, 
                 bias=True,

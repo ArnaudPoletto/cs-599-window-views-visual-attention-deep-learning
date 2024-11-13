@@ -15,9 +15,9 @@ class CorrelationCoefficientLoss(nn.Module):
 
         # Reshape if 4D tensors
         if pred.dim() == 4:
-            batch_size, sequence_length, height, width = pred.shape
-            pred = pred.view(batch_size * sequence_length, height, width)
-            target = target.view(batch_size * sequence_length, height, width)
+            batch_size, channels, height, width = pred.shape
+            pred = pred.view(batch_size * channels, height, width)
+            target = target.view(batch_size * channels, height, width)
 
         # Flatten predictions and targets
         batch_size = pred.size(0)

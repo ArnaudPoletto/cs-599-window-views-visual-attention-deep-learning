@@ -23,7 +23,7 @@ SEQUENCE_LENGTH = 3
 WITH_TRANSFORMS = True
 BATCH_SIZE = 2
 SPLITS = (0.7, 0.2, 0.1)
-N_WORKERS = 0
+N_WORKERS = 4
 
 SEED = 0
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

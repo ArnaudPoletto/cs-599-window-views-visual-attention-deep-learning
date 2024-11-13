@@ -206,7 +206,6 @@ def get_dataloaders(
     n_workers: int,
     seed: int = SEED,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    # Check if the splits are valid
     if not np.isclose(train_split + val_split + test_split, 1.0):
         raise ValueError(
             "❌ The sum of the train, validation, and test splits must be equal to 1."

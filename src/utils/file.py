@@ -11,8 +11,8 @@ from src.config import SAMPLES_PATH
 
 
 def get_paths_recursive(
-    folder_path: str, 
-    match_pattern: str, 
+    folder_path: str,
+    match_pattern: str,
     file_type: str = None,
     recursive: bool = True,
 ) -> List[str]:
@@ -33,10 +33,11 @@ def get_paths_recursive(
             f"❌ Invalid file type {file_type}. Must be None, 'f', or 'd'."
         )
 
-    # Use rglob for recursive search, glob for non-recursive
+    # Define search method and get paths
     search_method = Path(folder_path).rglob if recursive else Path(folder_path).glob
     paths = list(search_method(match_pattern))
-    
+
+    # Filter and resolve paths
     paths = [
         path.resolve().as_posix()
         for path in paths

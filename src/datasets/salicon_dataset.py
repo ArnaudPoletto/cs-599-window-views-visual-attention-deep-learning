@@ -7,11 +7,12 @@ sys.path.append(str(GLOBAL_DIR))
 import cv2
 import numpy as np
 from PIL import Image
-from typing import List
 import albumentations as A
-from torch.utils.data import Dataset
+from typing import List, Tuple
+from torch.utils.data import Dataset, DataLoader
 
 from src.utils.frame import Frame
+from src.utils.random import set_seed
 from src.utils.file import get_paths_recursive
 
 
@@ -94,6 +95,76 @@ class SaliconDataset(Dataset):
         )
         frame, ground_truths = self._apply_transforms(frame, ground_truths)
         frame = frame.transpose(2, 0, 1)
-        ground_truths = ground_truths[:, np.newaxis, :, :]
+        ground_truths = ground_truths.astype(np.float32) / 255.0
+        global_ground_truth = np.mean(ground_truths, axis=0)[np.newaxis, :, :]
+        print(frame.shape, ground_truths.shape, global_ground_truth.shape)
 
-        return frame, ground_truths
+        return frame, ground_truths, global_ground_truth
+    
+
+def get_dataloaders(
+    sample_folder_paths: List[str],
+    with_transforms: bool,
+    batch_size: int,
+    train_split: float,
+    val_split: float,
+    test_split: float,
+    train_shuffle: bool,
+    n_workers: int,
+    seed: int,
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    if not np.isclose(train_split + val_split + test_split, 1.0):
+        raise ValueError(
+            "❌ The sum of the train, validation, and test splits must be equal to 1."
+        )
+    
+    if seed is not None:
+        print(f"🌱 Setting the seed to {seed} for generating dataloaders")
+        set_seed(seed)
+
+    sample_indices = np.arange(len(sample_folder_paths))
+    np.random.shuffle(sample_indices)
+
+    train_samples = int(train_split * len(sample_indices))
+    val_samples = int(val_split * len(sample_indices))
+
+    train_indices = sample_indices[:train_samples]
+    val_indices = sample_indices[train_samples : train_samples + val_samples]
+    test_indices = sample_indices[train_samples + val_samples :]
+
+    train_dataset = SaliconDataset(
+        sample_folder_paths=[sample_folder_paths[i] for i in train_indices],
+        with_transforms=with_transforms,
+    )
+    val_dataset = SaliconDataset(
+        sample_folder_paths=[sample_folder_paths[i] for i in val_indices],
+        with_transforms=False,
+    )
+    test_dataset = SaliconDataset(
+        sample_folder_paths=[sample_folder_paths[i] for i in test_indices],
+        with_transforms=False,
+    )
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=train_shuffle,
+        num_workers=n_workers,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=n_workers,
+        pin_memory=True,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=n_workers,
+        pin_memory=True,
+    )
+
+    return train_loader, val_loader, test_loader

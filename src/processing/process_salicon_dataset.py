@@ -5,7 +5,6 @@ GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
 import os
-import pickle
 import shutil
 import argparse
 import numpy as np
@@ -13,12 +12,11 @@ import pandas as pd
 from PIL import Image
 from tqdm import tqdm
 import multiprocessing
-from typing import List, Dict
 from scipy.io import loadmat
+from typing import List, Dict
 from scipy.stats import gaussian_kde
 from concurrent.futures import ProcessPoolExecutor
 
-from src.utils.frame import Frame
 from src.utils.file import get_paths_recursive
 from src.config import (
     RAW_SALICON_GAZES_PATH,

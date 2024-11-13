@@ -7,8 +7,7 @@ from src.trainers.trainer import Trainer
 
 from src.config import DEVICE
 
-
-class UNetTrainer(Trainer):
+class TempSALTrainer(Trainer):
     def __init__(
         self,
         model: nn.Module,
@@ -35,16 +34,21 @@ class UNetTrainer(Trainer):
         return name
 
     def _forward_pass(self, batch: tuple) -> torch.Tensor:
-        frames, ground_truths, global_ground_truth = batch
-        frames = frames.float().to(DEVICE)
+        frame, ground_truths, global_ground_truth = batch
+        frame = frame.float().to(DEVICE)
         ground_truths = ground_truths.float().to(DEVICE)
         global_ground_truth = global_ground_truth.float().to(DEVICE)
 
         # Forward pass
         with autocast(enabled=self.use_scaler):
-            outputs = self.model(frames).squeeze(1)
+            outputs = self.model(frame)
 
-        loss = self.criterion(outputs, ground_truths)
+        # Choose the ground truth based on the model's output channels
+        if self.model.output_channels == 1:
+            ground_truth = global_ground_truth
+        else:
+            ground_truth = ground_truths
+        loss = self.criterion(outputs, ground_truth)
 
         # Compute loss
         return loss, None, None # TODO: return None for now
