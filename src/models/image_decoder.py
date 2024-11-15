@@ -5,108 +5,103 @@ GLOBAL_DIR = Path(__file__).parent / ".."
 sys.path.append(str(GLOBAL_DIR))
 
 import torch
+from typing import List
 from torch import nn
+
+IMAGE_SIZE = 331
 
 
 class ImageDecoder(nn.Module):
-    def __init__(self, output_channels: int) -> None:
+    """
+    An image decoder that decodes features into an image.
+    """
+
+    def __init__(
+        self,
+        features_channels: List[int],  # [96, 270, 1080, 2160, 4320]
+        hidden_channels: List[int],  # [128, 96, 270, 256, 512]
+        features_sizes: List[int],  # [165, 83, 42, 21, 11]
+        output_channels: int,
+    ) -> None:
+        """
+        Initializes the image decoder.
+
+        Args:
+            features_channels (List[int]): The number of channels of the features to decode.
+            hidden_channels (List[int]): The number of hidden channels to use.
+            features_sizes (List[int]): The sizes of the features to decode.
+            output_channels (int): The number of output channels.
+        """
         super(ImageDecoder, self).__init__()
 
-        self.deconv_layer0 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=4320, out_channels=512, kernel_size=3, padding=1, bias=True
-            ),
-            nn.ReLU(inplace=True),
-            nn.Upsample(size=(21, 21), mode="bilinear", align_corners=False),
+        self.features_channels = features_channels
+        self.hidden_channels = hidden_channels
+        self.features_sizes = features_sizes
+
+        # The decoder layers
+        in_channels = features_channels[::-1]
+        inc_channels = [0] + hidden_channels[::-1]
+        out_channels = hidden_channels[::-1]
+        sizes = features_sizes[::-1][1:]
+        self.deconvs = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(
+                        in_channels=in_c + inc_c,
+                        out_channels=out_c,
+                        kernel_size=3,
+                        padding=1,
+                        bias=False,
+                    ),
+                    nn.BatchNorm2d(num_features=out_c),
+                    nn.ReLU(inplace=True),
+                    nn.Upsample(
+                        size=(size, size), mode="bilinear", align_corners=False
+                    ),
+                )
+                for in_c, inc_c, out_c, size in zip(
+                    in_channels, inc_channels, out_channels, sizes
+                )
+            ]
         )
 
-        self.deconv_layer1 = nn.Sequential(
+        # The final layer
+        final_in_channels = hidden_channels[0]
+        self.final_layer = nn.Sequential(
             nn.Conv2d(
-                in_channels=512 + 2160,
-                out_channels=256,
+                in_channels=final_in_channels,
+                out_channels=final_in_channels,
                 kernel_size=3,
                 padding=1,
-                bias=True,
+                bias=False,
             ),
+            nn.BatchNorm2d(num_features=final_in_channels),
             nn.ReLU(inplace=True),
-            nn.Upsample(size=(42, 42), mode="bilinear", align_corners=False),
-        )
-
-        self.deconv_layer2 = nn.Sequential(
             nn.Conv2d(
-                in_channels=1080 + 256,
-                out_channels=270,
+                in_channels=final_in_channels,
+                out_channels=output_channels,
                 kernel_size=3,
                 padding=1,
-                bias=True,
-            ),
-            nn.ReLU(inplace=True),
-            nn.Upsample(size=(83, 83), mode="bilinear", align_corners=False),
-        )
-
-        self.deconv_layer3 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=540, 
-                out_channels=96, 
-                kernel_size=3, 
-                padding=1, 
-                bias=True,
-            ),
-            nn.ReLU(inplace=True),
-            nn.Upsample(size=(165, 165), mode="bilinear", align_corners=False),
-        )
-
-        self.deconv_layer4 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=192, 
-                out_channels=128, 
-                kernel_size=3, 
-                padding=1, 
-                bias=True,
-            ),
-            nn.ReLU(inplace=True),
-            nn.Upsample(size=(331, 331), mode="bilinear", align_corners=False),
-        )
-
-        self.deconv_layer5 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=128, 
-                out_channels=128, 
-                kernel_size=3, 
-                padding=1, 
-                bias=True,
-            ),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(
-                in_channels=128, 
-                out_channels=output_channels, 
-                kernel_size=3, 
-                padding=1, 
                 bias=True,
             ),
             nn.Sigmoid(),
         )
 
-    def forward(self, features):
-        out5 = features[-1]
-        out4 = features[-2]
-        out3 = features[-3]
-        out2 = features[-4]
-        out1 = features[-5]
+    def forward(self, features: List[torch.Tensor]) -> torch.Tensor:
+        """
+        Forward pass of the image decoder.
 
-        x = self.deconv_layer0(out5)
+        Args:
+            features (List[torch.Tensor]): The features to decode.
 
-        x = torch.cat((x, out4), 1)
-        x = self.deconv_layer1(x)
+        Returns:
+            torch.Tensor: The decoded image.
+        """
+        for i, (feature, deconv) in zip(features[::-1], self.deconvs):
+            if i > 0:
+                x = torch.cat((x, feature), 1)
+            x = deconv(x)
 
-        x = torch.cat((x, out3), 1)
-        x = self.deconv_layer2(x)
-
-        x = torch.cat((x, out2), 1)
-        x = self.deconv_layer3(x)
-        x = torch.cat((x, out1), 1)
-        x = self.deconv_layer4(x)
-
-        x = self.deconv_layer5(x)
+        x = self.final_layer(x)
 
         return x.squeeze(1)

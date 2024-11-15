@@ -1,0 +1,16 @@
+n_epochs: 5
+learning_rate: 1e-3
+weight_decay: 1e-6
+batch_size: 16
+accumulation_steps: 1
+evaluation_steps: 50
+splits: [0.98, 0.01, 0.01]
+save_model: True
+use_scaler: True
+with_transforms: True
+
+hidden_channels: 64
+output_channels: 5
+with_positional_embeddings: False
+with_graph_processing: False
+freeze_encoder: True

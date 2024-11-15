@@ -96,8 +96,15 @@ class SaliconDataset(Dataset):
         frame, ground_truths = self._apply_transforms(frame, ground_truths)
         frame = frame.transpose(2, 0, 1)
         ground_truths = ground_truths.astype(np.float32) / 255.0
-        global_ground_truth = np.mean(ground_truths, axis=0)[np.newaxis, :, :]
-        print(frame.shape, ground_truths.shape, global_ground_truth.shape)
+
+        # Get global ground truth
+        global_ground_truth = np.mean(ground_truths, axis=0)
+        min_val = global_ground_truth.min()
+        max_val = global_ground_truth.max()
+        if min_val == max_val:
+            global_ground_truth = np.zeros_like(global_ground_truth)
+        else:
+            global_ground_truth = (global_ground_truth - min_val) / (max_val - min_val)
 
         return frame, ground_truths, global_ground_truth
     
@@ -119,7 +126,7 @@ def get_dataloaders(
         )
     
     if seed is not None:
-        print(f"🌱 Setting the seed to {seed} for generating dataloaders")
+        print(f"🌱 Setting the seed to {seed} for generating dataloaders.")
         set_seed(seed)
 
     sample_indices = np.arange(len(sample_folder_paths))

@@ -16,28 +16,30 @@ class CorrelationCoefficientLoss(nn.Module):
         # Reshape if 4D tensors
         if pred.dim() == 4:
             batch_size, channels, height, width = pred.shape
-            pred = pred.view(batch_size * channels, height, width)
-            target = target.view(batch_size * channels, height, width)
+            pred = pred.reshape(batch_size * channels, height * width)
+            target = target.reshape(batch_size * channels, height * width)
+        elif pred.dim() == 3:
+            batch_size, height, width = pred.shape
+            pred = pred.reshape(batch_size, height * width)
+            target = target.reshape(batch_size, height * width)
 
-        # Flatten predictions and targets
-        batch_size = pred.size(0)
-        pred = pred.view(batch_size, -1)
-        target = target.view(batch_size, -1)
-
-        # Center the data
+        # Compute means and center the variables
         pred_mean = pred.mean(dim=1, keepdim=True)
         target_mean = target.mean(dim=1, keepdim=True)
-
         pred_centered = pred - pred_mean
         target_centered = target - target_mean
 
-        # Calculate correlation coefficient
-        numerator = (pred_centered * target_centered).sum(dim=1)
-        denominator = torch.sqrt(
-            (pred_centered**2).sum(dim=1) * (target_centered**2).sum(dim=1) + self.eps
-        )
-        correlation = numerator / denominator
+        # Compute variances
+        pred_variance = torch.sum(pred_centered ** 2, dim=1)
+        pred_variance = torch.clamp(pred_variance, min=self.eps)
+        target_variance = torch.sum(target_centered ** 2, dim=1)
+        target_variance = torch.clamp(target_variance, min=self.eps)
 
-        loss = 1 - correlation.mean()
+        # Compute correlation
+        covariance = torch.sum(pred_centered * target_centered, dim=1)
+        correlation = covariance / torch.sqrt(pred_variance * target_variance)
+        correlation = torch.clamp(correlation, min=-1.0, max=1.0)
+
+        loss = 1 - torch.mean(correlation)
 
         return loss

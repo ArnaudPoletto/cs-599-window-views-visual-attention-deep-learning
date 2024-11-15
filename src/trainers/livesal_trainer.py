@@ -7,8 +7,7 @@ from src.trainers.trainer import Trainer
 
 from src.config import DEVICE
 
-
-class UNetTrainer(Trainer):
+class LiveSALTrainer(Trainer):
     def __init__(
         self,
         model: nn.Module,
@@ -18,7 +17,7 @@ class UNetTrainer(Trainer):
         use_scaler: bool,
         name: str,
     ) -> None:
-        super(UNetTrainer, self).__init__(
+        super(LiveSALTrainer, self).__init__(
             model=model,
             criterion=criterion,
             accumulation_steps=accumulation_steps,
@@ -35,16 +34,20 @@ class UNetTrainer(Trainer):
         return name
 
     def _forward_pass(self, batch: tuple) -> torch.Tensor:
-        frames, ground_truths, global_ground_truth = batch
-        frames = frames.float().to(DEVICE)
+        frame, ground_truths, global_ground_truth = batch
+        frame = frame.float().to(DEVICE)
         ground_truths = ground_truths.float().to(DEVICE)
         global_ground_truth = global_ground_truth.float().to(DEVICE)
 
         # Forward pass
         with autocast(enabled=self.use_scaler):
-            outputs = self.model(frames).squeeze(1)
+            outputs = self.model(frame)
 
-        loss = self.criterion(outputs, ground_truths)
+        if self.model.output_channels == 1:
+            ground_truth = global_ground_truth
+        else:
+            ground_truth = ground_truths
+        loss = self.criterion(outputs, ground_truth)
 
         # Compute loss
-        return loss, None, None  # TODO: return None for now
+        return loss, None, None # TODO: return None for now

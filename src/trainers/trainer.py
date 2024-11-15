@@ -30,6 +30,8 @@ class Trainer(ABC):
         use_scaler: bool,
         name: str,
     ) -> None:
+        super(Trainer, self).__init__()
+        
         self.model = model
         self.criterion = criterion
         self.accumulation_steps = accumulation_steps
@@ -132,7 +134,7 @@ class Trainer(ABC):
         return statistics
 
     def _get_name(
-        self, optimizer: Optimizer, num_epochs: int, learning_rate: int
+        self, optimizer: Optimizer, n_epochs: int, learning_rate: int
     ) -> str:
         return self.name
 
@@ -141,12 +143,12 @@ class Trainer(ABC):
         train_loader: DataLoader,
         val_loader: DataLoader,
         optimizer: Optimizer,
-        num_epochs: int,
+        n_epochs: int,
         learning_rate: int,
         save_model: bool = True,
     ) -> None:
         # Get name with timestamp
-        name = self._get_name(optimizer, num_epochs, learning_rate)
+        name = self._get_name(optimizer, n_epochs, learning_rate)
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         name = f"{timestamp}_{name}"
 
@@ -160,19 +162,19 @@ class Trainer(ABC):
 
         # Setup WandB and watch
         wandb.init(
-            project=self.__class__.__name__.lower(),
+            project="thesis",
+            group=self.__class__.__name__.lower(),
+            name=name,
             config={
-                "architecture": self.__class__.__name__,
-                "name": name,
                 "dataset": "Window View",
-                "epochs": num_epochs,
+                "n_epochs": n_epochs,
                 "learning_rate": learning_rate,
             },
         )
         wandb.watch(self.model, log_freq=4, log="all")
 
         print(
-            f"🚀 Training {self.__class__.__name__} method for {num_epochs} epochs..."
+            f"🚀 Training {self.__class__.__name__} method for {n_epochs} epochs..."
         )
         # model number traininable
         print(f"🔧 Model has {sum(p.numel() for p in self.model.parameters() if p.requires_grad):,} trainable parameters")
@@ -181,7 +183,7 @@ class Trainer(ABC):
         scaler = GradScaler(enabled=self.use_scaler)
 
         # Training loop
-        with tqdm(range(num_epochs), desc="⌛ Running epochs...", unit="epoch") as bar:
+        with tqdm(range(n_epochs), desc="⌛ Running epochs...", unit="epoch") as bar:
             for _ in bar:
                 self._train_one_epoch(
                     train_loader,

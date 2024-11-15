@@ -1,5 +1,3 @@
-# TODO: useless for now
-
 from src.utils.sample import Sample
 from src.utils.sequence import Sequence
 import numpy as np

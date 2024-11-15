@@ -26,7 +26,6 @@ from src.config import (
     N_WORKERS,
     BATCH_SIZE,
     SEQUENCE_LENGTH,
-    WITH_TRANSFORMS,
 )
 
 FREEZE_ENCODER = True
@@ -37,6 +36,7 @@ ACCUMULATION_STEPS = 1
 EVALUATION_STEPS = 50
 EPOCHS = 10
 USE_SCALER = False
+WITH_TRANSFORMS = True
 
 
 def get_model(freeze_encoder: bool) -> nn.Module:
@@ -122,7 +122,7 @@ def main() -> None:
         train_loader=train_loader,
         val_loader=val_loader,
         optimizer=optimizer,
-        num_epochs=EPOCHS,
+        n_epochs=EPOCHS,
         learning_rate=LEARNING_RATE,
         save_model=SAVE_MODEL,
     )

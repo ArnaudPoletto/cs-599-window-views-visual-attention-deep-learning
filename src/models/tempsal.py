@@ -13,6 +13,9 @@ class TempSAL(nn.Module):
     ):
         super(TempSAL, self).__init__()
 
+        self.output_channels = output_channels
+        self.freeze_encoder = freeze_encoder
+        
         self.encoder = ImageEncoder()
         self.decoder = ImageDecoder(output_channels=output_channels)
 

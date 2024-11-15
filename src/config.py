@@ -7,6 +7,7 @@ sys.path.append(str(GLOBAL_DIR))
 import torch
 
 DATA_PATH = str(GLOBAL_DIR / "data")
+CONFIG_PATH = str(GLOBAL_DIR / "config")
 GAZE_PATH = f"{DATA_PATH}/gaze"
 SETS_PATH = f"{DATA_PATH}/sets"
 SAMPLES_PATH = f"{DATA_PATH}/samples"
@@ -20,7 +21,6 @@ RAW_SALICON_IMAGES_PATH = f"{RAW_SALICON_PATH}/images"
 FIXATION_DATA_PATH = f"{GAZE_PATH}/fixation_data.csv"
 
 SEQUENCE_LENGTH = 3
-WITH_TRANSFORMS = True
 BATCH_SIZE = 2
 SPLITS = (0.7, 0.2, 0.1)
 N_WORKERS = 4

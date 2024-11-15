@@ -9,12 +9,12 @@ import argparse
 import torch.nn as nn
 
 from src.utils.random import set_seed
-from src.models.tempsal import TempSAL
+from src.models.livesal import LiveSAL
 from src.utils.parser import get_config
 from src.losses.kl_div import KLDivLoss
 from src.losses.combined import CombinedLoss
 from src.utils.file import get_paths_recursive
-from src.trainers.tempsal_trainer import TempSALTrainer
+from src.trainers.livesal_trainer import LiveSALTrainer
 from src.datasets.salicon_dataset import get_dataloaders
 from src.losses.correlation_coefficient import CorrelationCoefficientLoss
 from src.config import (
@@ -27,12 +27,19 @@ from src.config import (
 
 
 def get_model(
+    hidden_channels: int,
     output_channels: int,
+    with_positional_embeddings: bool,
+    with_graph_processing: bool,
     freeze_encoder: bool,
 ) -> nn.Module:
-    return TempSAL(output_channels=output_channels, freeze_encoder=freeze_encoder).to(
-        DEVICE
-    )
+    return LiveSAL(
+        hidden_channels=hidden_channels,
+        output_channels=output_channels,
+        with_positional_embeddings=with_positional_embeddings,
+        with_graph_processing=with_graph_processing,
+        freeze_encoder=freeze_encoder,
+    ).to(DEVICE)
 
 
 def get_criterion() -> nn.Module:
@@ -40,8 +47,8 @@ def get_criterion() -> nn.Module:
     corr_loss = CorrelationCoefficientLoss(eps=1e-7)
     criterion = CombinedLoss(
         {
-            "kl": (kl_loss, 1.0), # TODO: remove hardocded values
-            "corr": (corr_loss, 1.0), # TODO: remove hardocded values
+            "kl": (kl_loss, 1.0),
+            "corr": (corr_loss, 0.5),
         }
     )
 
@@ -66,14 +73,14 @@ def get_trainer(
     accumulation_steps: int,
     evaluation_steps: int,
     use_scaler: bool,
-) -> TempSALTrainer:
-    return TempSALTrainer(
+) -> LiveSALTrainer:
+    return LiveSALTrainer(
         model=model,
         criterion=criterion,
         accumulation_steps=accumulation_steps,
         evaluation_steps=evaluation_steps,
         use_scaler=use_scaler,
-        name=f"tempsal",
+        name=f"livesal",
     )
 
 
@@ -92,7 +99,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/tempsal/temporal.yml",
+        default=f"{CONFIG_PATH}/livesal/global.yml",
         help="The path to the config file.",
     )
         
@@ -118,7 +125,10 @@ def main() -> None:
     save_model = bool(config["save_model"])
     use_scaler = bool(config["use_scaler"])
     with_transforms = bool(config["with_transforms"])
-    decoder_output_channels = int(config["decoder_output_channels"])
+    hidden_channels = int(config["hidden_channels"])
+    output_channels = int(config["output_channels"])
+    with_positional_embeddings = bool(config["with_positional_embeddings"])
+    with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
@@ -138,7 +148,10 @@ def main() -> None:
         seed=SEED,
     )
     model = get_model(
-        output_channels=decoder_output_channels,
+        hidden_channels=hidden_channels,
+        output_channels=output_channels,
+        with_positional_embeddings=with_positional_embeddings,
+        with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
     )
     criterion = get_criterion()

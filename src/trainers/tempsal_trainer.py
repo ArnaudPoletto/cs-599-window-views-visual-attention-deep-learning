@@ -17,7 +17,7 @@ class TempSALTrainer(Trainer):
         use_scaler: bool,
         name: str,
     ) -> None:
-        super().__init__(
+        super(TempSALTrainer, self).__init__(
             model=model,
             criterion=criterion,
             accumulation_steps=accumulation_steps,
@@ -27,7 +27,7 @@ class TempSALTrainer(Trainer):
         )
 
     def _get_name(
-        self, optimizer: Optimizer, num_epochs: int, learning_rate: float
+        self, optimizer: Optimizer, n_epochs: int, learning_rate: float
     ) -> str:
         name = self.name
 
