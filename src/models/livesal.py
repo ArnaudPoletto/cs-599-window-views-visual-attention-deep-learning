@@ -1,10 +1,9 @@
 import math
 import torch
 from torch import nn
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from src.models.image_encoder import ImageEncoder
-from src.config import DEVICE
 
 GRAPH_PROCESSOR_N_ITERATIONS = 3
 
@@ -59,144 +58,163 @@ class ConvGRU(nn.Module):
 
 class GraphProcessor(nn.Module):
     def __init__(
-        self, hidden_channels: int, n_iterations: int = GRAPH_PROCESSOR_N_ITERATIONS
+        self,
+        hidden_channels: int,
+        n_iterations: int = GRAPH_PROCESSOR_N_ITERATIONS,
     ):
         super(GraphProcessor, self).__init__()
 
         self.hidden_channels = hidden_channels
         self.n_iterations = n_iterations
         self.scale = hidden_channels**-0.5
-        self.embedding_channels = 4  # TODO: remove hardcoded
 
-        self.embedding_proj = nn.Sequential(
+        self.intra_key_conv = nn.Conv2d(
+            in_channels=hidden_channels,
+            out_channels=hidden_channels,
+            kernel_size=1,
+            padding=0,
+            bias=True,
+        )
+        self.intra_query_conv = nn.Conv2d(
+            in_channels=hidden_channels,
+            out_channels=hidden_channels,
+            kernel_size=1,
+            padding=0,
+            bias=True,
+        )
+        self.intra_value_conv = nn.Conv2d(
+            in_channels=hidden_channels,
+            out_channels=hidden_channels,
+            kernel_size=1,
+            padding=0,
+            bias=True,
+        )
+        self.intra_alpha = nn.Parameter(torch.tensor(1.0))
+
+        self.inter_message_edge_conv = nn.Conv2d(
+            in_channels=hidden_channels + 1, # TODO: UPDATE HARDCODED VALUE
+            out_channels=hidden_channels,
+            kernel_size=1,
+            padding=0,
+            bias=True,
+        )
+        self.inter_weight = nn.Linear(hidden_channels, hidden_channels, bias=False)
+
+        self.weight = nn.Parameter(torch.tensor(0.5))
+
+        self.inter_gate_conv = nn.Sequential(
             nn.Conv2d(
-                hidden_channels + self.embedding_channels, hidden_channels, 1, bias=True
-            ),  # TODO: remove hardcoded
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(hidden_channels),
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=1,
+                padding=0,
+                bias=True,
+            ),
+            nn.AdaptiveAvgPool2d(1),
+            nn.Sigmoid(),
         )
-
-        self.Wf = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.Wh = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.Wl = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.alpha = nn.Parameter(torch.ones(1))
-
-        self.Wc = nn.Parameter(torch.randn(hidden_channels, hidden_channels))
-
-        self.Wg = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.gap = nn.AdaptiveAvgPool2d(1)
-        self.message_bn = nn.BatchNorm2d(hidden_channels)
 
         self.gru = ConvGRU(
             input_channels=hidden_channels,
             hidden_channels=hidden_channels,
-            kernel_size=5,
-            padding=2,
+            kernel_size=3,
+            padding=1,
         )
 
-        self.intra_weight = nn.Parameter(torch.tensor(0.5))
-        self.inter_weight = nn.Parameter(torch.tensor(0.5))
+        self.norm = nn.LayerNorm(
+            [hidden_channels, 11, 11]
+        )  # TODO: remove hardocded size
 
-        self.sigmoid = nn.Sigmoid()
+    def _compute_edge_features(
+        self,
+        i: int,
+        j: int,
+        batch_size: int,
+        height: int,
+        width: int,
+    ) -> torch.Tensor:
+        edge_features = torch.full(
+            (batch_size, 1, height, width), i - j, dtype=torch.float32
+        )
+
+        return edge_features
 
     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
-        ft = self.Wf(x)
-        ht = self.Wh(x)
-        lt = self.Wl(x)
-
         batch_size, channels, height, width = x.shape
-        ft = ft.view(batch_size, channels, -1)
-        ht = ht.view(batch_size, channels, -1)
-        lt = lt.view(batch_size, channels, -1)
 
-        attention = torch.bmm(ft.transpose(1, 2), ht)
+        query = self.intra_query_conv(x).view(batch_size, channels, -1)
+        key = self.intra_key_conv(x).view(batch_size, channels, -1)
+        value = self.intra_value_conv(x).view(batch_size, channels, -1)
+
+        attention = torch.bmm(query.transpose(1, 2), key) * self.scale
         attention = torch.softmax(attention, dim=-1)
-        context = torch.bmm(attention, lt.transpose(1, 2))
-        context = context.transpose(1, 2).view(batch_size, channels, height, width)
 
-        eii = self.alpha * context + x
+        output = torch.bmm(attention, value.transpose(1, 2))
+        output = output.transpose(1, 2).view(batch_size, channels, height, width)
+        output = self.intra_alpha * output + x
 
-        return eii
+        return output
 
     def _compute_inter_attention(
-        self, x: torch.Tensor, y: torch.Tensor
+        self, i: int, x: torch.Tensor, neighbors: List[Tuple[int, torch.Tensor]]
     ) -> torch.Tensor:
         batch_size, channels, height, width = x.shape
-        x_flat = x.view(batch_size, channels, -1)
-        y_flat = y.view(batch_size, channels, -1)
 
-        yt = torch.matmul(self.Wc, y_flat)
-        eij = torch.bmm(x_flat.transpose(1, 2), yt)
+        x = x.view(batch_size, channels, -1)
 
-        return eij
+        messages = []
+        gates = []
+        for j, y in neighbors:
+            eij = self._compute_edge_features(i, j, batch_size, height, width)
+            eij = eij.to(x.device)
 
-    def _compute_message(self, x: torch.Tensor, eij: torch.Tensor) -> torch.Tensor:
-        batch_size, channels, height, width = x.shape
-        x_flat = x.view(batch_size, channels, -1)
+            y = torch.cat([y, eij], dim=1)
+            y = self.inter_message_edge_conv(y)
+            y = y.view(batch_size, channels, -1)
+            y = self.inter_weight(y.transpose(1, 2)).transpose(1, 2)
 
-        eij_norm = torch.softmax(eij, dim=-1)
-        mji = torch.bmm(eij_norm, x_flat.transpose(1, 2))
-        mji = mji.transpose(1, 2).view(batch_size, channels, height, width)
+            e = torch.bmm(x.transpose(1, 2), y)
+            e = torch.softmax(e, dim=-1)
 
-        gji = self.gap(self.Wg(mji))
-        gji = self.sigmoid(gji)
+            message = (
+                torch.bmm(e, y.transpose(1, 2))
+                .transpose(1, 2)
+                .view(batch_size, channels, height, width)
+            )
+            gate = self.inter_gate_conv(message)
 
-        mji_gated = gji * mji
-        mji_gated = self.message_bn(mji_gated)
+            messages.append(message)
+            gates.append(gate)
 
-        return mji_gated
+        if messages:
+            messages = torch.stack(messages, dim=0)
+            gates = torch.stack(gates, dim=0)
+            gated_messages = messages * gates
+            output = torch.sum(gated_messages, dim=0)
+        else:
+            output = torch.zeros_like(x)
+
+        return output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Initial node states
         sequence_length, batch_size, channels, height, width = x.shape
         h = x
-
         for _ in range(self.n_iterations):
-            messages = []
-            for i in range(sequence_length):
-                intra_message = self._compute_intra_attention(h[i])
-                node_messages = []
-                for j in range(sequence_length):
-                    if i == j:
-                        continue
-
-                    eij = self._compute_inter_attention(h[i], h[j])
-                    message = self._compute_message(h[j], eij)
-                    node_messages.append(message)
-
-                node_messages = torch.stack(node_messages, dim=0)
-                inter_message = torch.sum(node_messages, dim=0)
-                aggregated_message = self.intra_weight * intra_message + self.inter_weight * inter_message
-                messages.append(aggregated_message)
-
             new_h = []
             for i in range(sequence_length):
-                next_h = self.gru(messages[i], h[i]) + h[i]
+                intra_output = self._compute_intra_attention(h[i])
+
+                neighbors = [(j, h[j]) for j in range(sequence_length) if abs(i - j) == 1]
+                inter_output = self._compute_inter_attention(i, h[i], neighbors)
+                combined_message = (
+                    self.weight * intra_output + (1 - self.weight) * inter_output
+                )
+
+                next_h = self.gru(combined_message, h[i])
+                next_h = next_h + h[i]
+                next_h = self.norm(next_h)
                 new_h.append(next_h)
+
             h = torch.stack(new_h, dim=0)
 
         return h
@@ -210,6 +228,7 @@ class LiveSAL(nn.Module):
         with_positional_embeddings: bool,
         with_graph_processing: bool,
         freeze_encoder: bool,
+        fusion_level: Optional[int] = None,
     ):
         super(LiveSAL, self).__init__()
 
@@ -225,9 +244,23 @@ class LiveSAL(nn.Module):
             for param in self.encoder.parameters():
                 param.requires_grad = False
 
+        # Set fusion level and size
+        if fusion_level is None:
+            fusion_level = len(self.encoder.feature_sizes) // 2
+            print(f"➡️ Default fusion level set to {fusion_level}.")
+        if fusion_level < 0:
+            raise ValueError(
+                f"❌ Fusion level must be greater than or equal to 0, got {fusion_level}."
+            )
+        if fusion_level >= len(self.encoder.feature_sizes):
+            raise ValueError(
+                f"❌ Fusion level must be less than {len(self.encoder.feature_sizes)}, got {fusion_level}."
+            )
+        self.fusion_level = fusion_level
+        self.fusion_size = self.encoder.feature_sizes[self.fusion_level]
+
         # Projection layers to project encoded features to a common space
         # Add 2 spatial awareness layers with depthwise separable 3x3 conv for efficiency
-        encoder_channels = [96, 270, 1080, 2160, 4320]
         self.projection_layers = nn.ModuleList(
             [
                 nn.Sequential(
@@ -260,7 +293,7 @@ class LiveSAL(nn.Module):
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
                 )
-                for in_ch in encoder_channels
+                for in_ch in self.encoder.feature_channels
             ]
         )
 
@@ -277,9 +310,10 @@ class LiveSAL(nn.Module):
         )
 
         if with_positional_embeddings:
-            # TODO: change hardcoded positional embeddings size
             self.positional_embeddings = nn.Parameter(
-                torch.randn(output_channels, hidden_channels, 21, 21)
+                torch.randn(
+                    output_channels, hidden_channels, self.fusion_size, self.fusion_size
+                )
             )
 
         if with_graph_processing:
@@ -308,12 +342,11 @@ class LiveSAL(nn.Module):
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
                 )
-                for _ in range(4) # TODO: remove hardcoded
+                for _ in range(fusion_level - 1)
             ]
         )
 
         # Final layer
-        final_out_channels = 1 if with_graph_processing else output_channels
         self.final_layer = nn.Sequential(
             nn.Conv2d(
                 in_channels=hidden_channels,
@@ -326,7 +359,7 @@ class LiveSAL(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channels=hidden_channels // 2,
-                out_channels=final_out_channels,
+                out_channels=1,
                 kernel_size=3,
                 padding=1,
                 bias=True,
@@ -338,7 +371,7 @@ class LiveSAL(nn.Module):
 
     def _get_features_list(self, x: torch.Tensor, is_image: bool) -> List[torch.Tensor]:
         # Flatten batch_size and sequence_length for video inputs to pass through the encoder
-        if self.with_graph_processing and not is_image:
+        if not is_image:
             batch_size, sequence_length, channels, height, width = x.shape
             x = x.view(-1, channels, height, width)
 
@@ -358,8 +391,8 @@ class LiveSAL(nn.Module):
             projected_features_list.append(projected_features)
 
         # Get skip features, and repeat image skip features for graph processing
-        skip_features_list = projected_features_list[:4] # TODO: remove hardcoded
-        if self.with_graph_processing and is_image:
+        skip_features_list = projected_features_list[: self.fusion_level]
+        if is_image:
             resized_skip_features_list = []
             for skip_features in skip_features_list:
                 batch_size, channels, height, width = skip_features.shape
@@ -378,7 +411,7 @@ class LiveSAL(nn.Module):
         self, projected_features_list: List[torch.Tensor], is_image: bool
     ) -> torch.Tensor:
         # Resize features to middle scale
-        base_size = projected_features_list[3].shape[-2:] # TODO: remove hardcoded
+        base_size = (self.fusion_size, self.fusion_size)
         resized_features_list = []
         for features in projected_features_list:
             if features.shape[-2:] != base_size:
@@ -394,7 +427,7 @@ class LiveSAL(nn.Module):
         fused_features = self.fusion(torch.cat(resized_features_list, dim=1))
 
         # Repeat image features for graph processing
-        if self.with_graph_processing and is_image:
+        if is_image:
             batch_size, channels, height, width = fused_features.shape
             fused_features = fused_features.unsqueeze(1).repeat(
                 1, self.output_channels, 1, 1, 1
@@ -441,37 +474,29 @@ class LiveSAL(nn.Module):
         skip_features_list: List[torch.Tensor],
         is_image: bool,
     ) -> torch.Tensor:
-        if self.with_graph_processing:
-            # Organize features as independent samples
-            batch_size_sequence_length, channels, height, width = fused_features.shape
-            fused_features_list = (
-                fused_features.view(-1, self.output_channels, channels, height, width)
+        # Organize features as independent samples
+        batch_size_sequence_length, channels, height, width = fused_features.shape
+        fused_features_list = (
+            fused_features.view(-1, self.output_channels, channels, height, width)
+            .transpose(0, 1)
+            .contiguous()
+        )
+        resized_skip_features_list = []
+        for skip_features in skip_features_list:
+            batch_size_sequence_length, channels, height, width = skip_features.shape
+            skip_features = (
+                skip_features.view(-1, self.output_channels, channels, height, width)
                 .transpose(0, 1)
                 .contiguous()
             )
-            resized_skip_features_list = []
-            for skip_features in skip_features_list:
-                batch_size_sequence_length, channels, height, width = (
-                    skip_features.shape
-                )
-                skip_features = (
-                    skip_features.view(
-                        -1, self.output_channels, channels, height, width
-                    )
-                    .transpose(0, 1)
-                    .contiguous()
-                )
-                resized_skip_features_list.append(skip_features)
-            skip_features_list = [
-                [
-                    resized_skip_features_list[j][i]
-                    for j in range(len(resized_skip_features_list))
-                ]
-                for i in range(self.output_channels)
+            resized_skip_features_list.append(skip_features)
+        skip_features_list = [
+            [
+                resized_skip_features_list[j][i]
+                for j in range(len(resized_skip_features_list))
             ]
-        else:
-            fused_features_list = [fused_features]
-            skip_features_list = [skip_features_list]
+            for i in range(self.output_channels)
+        ]
 
         # Decode sample features sequentially
         decoded_features_list = []
@@ -550,7 +575,7 @@ class LiveSAL(nn.Module):
 
         # Process features if needed
         if self.with_graph_processing:
-           fused_features = self._get_graph_features(fused_features)
+            fused_features = self._get_graph_features(fused_features)
 
         # Decode features
         decoded_features_list = self._decode_features(
