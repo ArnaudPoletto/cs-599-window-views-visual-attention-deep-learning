@@ -1,6 +1,7 @@
 data/
 generated/
 *wandb/
+*.pth
 
 
 # Byte-compiled / optimized / DLL files

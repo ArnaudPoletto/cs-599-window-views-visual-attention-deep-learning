@@ -32,6 +32,7 @@ def get_model(
     with_positional_embeddings: bool,
     with_graph_processing: bool,
     freeze_encoder: bool,
+    fusion_level: int,
 ) -> nn.Module:
     return LiveSAL(
         hidden_channels=hidden_channels,
@@ -39,6 +40,7 @@ def get_model(
         with_positional_embeddings=with_positional_embeddings,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
+        fusion_level=fusion_level,
     ).to(DEVICE)
 
 
@@ -130,6 +132,7 @@ def main() -> None:
     with_positional_embeddings = bool(config["with_positional_embeddings"])
     with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
+    fusion_level = int(config["fusion_level"]) if "fusion_level" in config else None
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataloaders, model, criterion, optimizer, and trainer
@@ -153,6 +156,7 @@ def main() -> None:
         with_positional_embeddings=with_positional_embeddings,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
+        fusion_level=fusion_level,
     )
     criterion = get_criterion()
     optimizer = get_optimizer(
