@@ -62,11 +62,10 @@ def get_optimizer(
     learning_rate: float,
     weight_decay: float,
 ) -> nn.Module:
-    return torch.optim.AdamW(
+    return torch.optim.Adam(
         model.parameters(),
         lr=learning_rate,
         weight_decay=weight_decay,
-        betas=(0.9, 0.95),
     )
 
 

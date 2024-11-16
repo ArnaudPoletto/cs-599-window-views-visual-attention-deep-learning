@@ -1,13 +1,13 @@
-import sys
+import os
+import torch
 from pathlib import Path
 
-CODE_DIR = "/home/poletto/code"
-SCRATCH_DIR = "/scratch/izar/poletto"
+paths_file_path = "../paths.py"
+if not os.path.exists(paths_file_path):
+    raise FileNotFoundError(f"❌ File {Path(paths_file_path).resolve} not found. Please create it and define DATA_PATH and CODE_PATH.")
+from ..paths import DATA_PATH, CODE_PATH
 
-import torch
-
-DATA_PATH = f"{SCRATCH_DIR}/data"
-CONFIG_PATH = f"{CODE_DIR}/config"
+CONFIG_PATH = f"{CODE_PATH}/config"
 GAZE_PATH = f"{DATA_PATH}/gaze"
 SETS_PATH = f"{DATA_PATH}/sets"
 SAMPLES_PATH = f"{DATA_PATH}/samples"
@@ -23,7 +23,7 @@ FIXATION_DATA_PATH = f"{GAZE_PATH}/fixation_data.csv"
 SEQUENCE_LENGTH = 3
 BATCH_SIZE = 2
 SPLITS = (0.7, 0.2, 0.1)
-N_WORKERS = 8
+N_WORKERS = 4
 
 SEED = 0
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
