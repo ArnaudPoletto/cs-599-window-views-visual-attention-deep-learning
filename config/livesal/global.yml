@@ -14,3 +14,4 @@ output_channels: 1
 with_positional_embeddings: False
 with_graph_processing: False
 freeze_encoder: True
+fusion_level: 4

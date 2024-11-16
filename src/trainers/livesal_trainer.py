@@ -1,7 +1,8 @@
 import torch
 from torch import nn
-from torch.cuda.amp import autocast
+from typing import Dict, Any
 from torch.optim import Optimizer
+from torch.cuda.amp import autocast
 
 from src.trainers.trainer import Trainer
 
@@ -25,6 +26,18 @@ class LiveSALTrainer(Trainer):
             use_scaler=use_scaler,
             name=name,
         )
+
+    def _get_wandb_config(self) -> Dict[str, Any]:
+        return {
+            "model_name": self.model.__class__.__name__,
+            "hidden_channels": self.model.hidden_channels,
+            "output_channels": self.model.output_channels,
+            "with_positional_embeddings": self.model.with_positional_embeddings,
+            "with_graph_processing": self.model.with_graph_processing,
+            "freeze_encoder": self.model.freeze_encoder,
+            "fusion_level": self.model.fusion_level,
+
+        }
 
     def _get_name(
         self, optimizer: Optimizer, n_epochs: int, learning_rate: float

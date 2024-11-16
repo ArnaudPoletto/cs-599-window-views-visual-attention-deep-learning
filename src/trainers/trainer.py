@@ -44,6 +44,10 @@ class Trainer(ABC):
         self.eval_val_loss = 0
 
     @abstractmethod
+    def _get_wandb_config(self) -> dict[str, any]:
+        raise NotImplementedError
+
+    @abstractmethod
     def _forward_pass(
         self, batch: tuple
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -58,7 +62,6 @@ class Trainer(ABC):
         bar: tqdm,
         save_path: str = None,
     ) -> None:
-        self.model.train()
 
         total_train_loss = 0
         n_train_loss = 0
@@ -72,10 +75,7 @@ class Trainer(ABC):
             scaler.scale(train_loss).backward()
 
             # Optimize every accumulation steps
-            if ((batch_idx + 1) % self.accumulation_steps == 0) or (
-                len(train_loader) < self.accumulation_steps
-                and batch_idx == len(train_loader) - 1
-            ):
+            if (batch_idx + 1) % self.accumulation_steps == 0:
                 scaler.step(optimizer)
                 scaler.update()
 
@@ -88,10 +88,7 @@ class Trainer(ABC):
                     }
                 )
 
-            if ((batch_idx + 1) % self.evaluation_steps == 0) or (
-                len(train_loader) < self.evaluation_steps
-                and batch_idx == len(train_loader) - 1
-            ):
+            if (batch_idx + 1) % self.evaluation_steps == 0:
                 # Get and update training loss
                 self.eval_train_loss = total_train_loss / n_train_loss
                 total_train_loss = 0
@@ -137,6 +134,7 @@ class Trainer(ABC):
         statistics = {
             "loss": total_val_loss,
         }
+        self.model.train()
 
         return statistics
 
@@ -166,15 +164,18 @@ class Trainer(ABC):
         save_path = f"{model_path}/{name}.pth" if save_model else None
 
         # Setup WandB and watch
+        wandb_config = self._get_wandb_config()
+        wandb_config.update(
+            {
+                "n_epochs": n_epochs,
+                "learning_rate": learning_rate,
+            }
+        )
         wandb.init(
             project="thesis",
             group=self.__class__.__name__.lower(),
             name=name,
-            config={
-                "dataset": "Window View",
-                "n_epochs": n_epochs,
-                "learning_rate": learning_rate,
-            },
+            config=wandb_config,
         )
         wandb.watch(self.model, log_freq=4, log="all")
 
@@ -188,6 +189,7 @@ class Trainer(ABC):
         scaler = GradScaler(enabled=self.use_scaler)
 
         # Training loop
+        self.model.train()
         with tqdm(range(n_epochs), desc="⌛ Running epochs...", unit="epoch") as bar:
             for _ in bar:
                 self._train_one_epoch(
