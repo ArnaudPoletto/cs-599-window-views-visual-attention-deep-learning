@@ -2,6 +2,7 @@ data/
 generated/
 *wandb/
 *.pth
+paths.py
 
 
 # Byte-compiled / optimized / DLL files

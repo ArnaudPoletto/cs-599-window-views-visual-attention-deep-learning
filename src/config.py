@@ -1,13 +1,13 @@
-import sys
+import os
+import torch
 from pathlib import Path
 
-GLOBAL_DIR = Path(__file__).parent / ".."
-sys.path.append(str(GLOBAL_DIR))
+paths_file_path = "../paths.py"
+if not os.path.exists(paths_file_path):
+    raise FileNotFoundError(f"❌ File {Path(paths_file_path).resolve} not found. Please create it and define DATA_PATH and CODE_PATH.")
+from ..paths import DATA_PATH, CODE_PATH
 
-import torch
-
-DATA_PATH = str(GLOBAL_DIR / "data")
-CONFIG_PATH = str(GLOBAL_DIR / "config")
+CONFIG_PATH = f"{CODE_PATH}/config"
 GAZE_PATH = f"{DATA_PATH}/gaze"
 SETS_PATH = f"{DATA_PATH}/sets"
 SAMPLES_PATH = f"{DATA_PATH}/samples"
