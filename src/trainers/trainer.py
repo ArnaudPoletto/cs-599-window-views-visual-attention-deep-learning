@@ -31,7 +31,7 @@ class Trainer(ABC):
         name: str,
     ) -> None:
         super(Trainer, self).__init__()
-        
+
         self.model = model
         self.criterion = criterion
         self.accumulation_steps = accumulation_steps
@@ -73,7 +73,8 @@ class Trainer(ABC):
 
             # Optimize every accumulation steps
             if ((batch_idx + 1) % self.accumulation_steps == 0) or (
-                batch_idx + 1 == len(train_loader)
+                len(train_loader) < self.accumulation_steps
+                and batch_idx == len(train_loader) - 1
             ):
                 scaler.step(optimizer)
                 scaler.update()
@@ -87,8 +88,9 @@ class Trainer(ABC):
                     }
                 )
 
-            if (batch_idx + 1) % self.evaluation_steps == 0 or (
-                batch_idx + 1 == len(train_loader)
+            if ((batch_idx + 1) % self.evaluation_steps == 0) or (
+                len(train_loader) < self.evaluation_steps
+                and batch_idx == len(train_loader) - 1
             ):
                 # Get and update training loss
                 self.eval_train_loss = total_train_loss / n_train_loss
@@ -98,8 +100,13 @@ class Trainer(ABC):
                 # Get validation loss and update best model
                 stats = self._evaluate(val_loader)
                 self.eval_val_loss = stats["loss"]
-                if self.eval_val_loss < self.best_eval_val_loss and save_path is not None:
-                    print(f"🎉 Saving model with new best loss: {self.eval_val_loss:.4f}")
+                if (
+                    self.eval_val_loss < self.best_eval_val_loss
+                    and save_path is not None
+                ):
+                    print(
+                        f"🎉 Saving model with new best loss: {self.eval_val_loss:.4f}"
+                    )
                     torch.save(self.model.state_dict(), save_path)
                     self.best_eval_val_loss = self.eval_val_loss
 
@@ -133,9 +140,7 @@ class Trainer(ABC):
 
         return statistics
 
-    def _get_name(
-        self, optimizer: Optimizer, n_epochs: int, learning_rate: int
-    ) -> str:
+    def _get_name(self, optimizer: Optimizer, n_epochs: int, learning_rate: int) -> str:
         return self.name
 
     def train(
@@ -173,11 +178,11 @@ class Trainer(ABC):
         )
         wandb.watch(self.model, log_freq=4, log="all")
 
-        print(
-            f"🚀 Training {self.__class__.__name__} method for {n_epochs} epochs..."
-        )
+        print(f"🚀 Training {self.__class__.__name__} method for {n_epochs} epochs...")
         # model number traininable
-        print(f"🔧 Model has {sum(p.numel() for p in self.model.parameters() if p.requires_grad):,} trainable parameters")
+        print(
+            f"🔧 Model has {sum(p.numel() for p in self.model.parameters() if p.requires_grad):,} trainable parameters"
+        )
 
         # Scaler
         scaler = GradScaler(enabled=self.use_scaler)
