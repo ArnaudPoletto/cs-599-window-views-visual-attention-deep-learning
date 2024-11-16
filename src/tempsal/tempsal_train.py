@@ -6,6 +6,7 @@ sys.path.append(str(GLOBAL_DIR))
 
 import torch
 import argparse
+import subprocess
 import torch.nn as nn
 
 from src.utils.random import set_seed
@@ -98,8 +99,29 @@ def parse_arguments() -> argparse.Namespace:
         
     return parser.parse_args()
 
+# TODO
+def get_all_gpus():
+    try:
+        result = subprocess.check_output(
+            ['nvidia-smi', '--query-gpu=index,name', '--format=csv,noheader'],
+            encoding='utf-8')
+        gpus = result.strip().split('\n')
+        gpu_info = [gpu.strip() for gpu in gpus]
+        return gpu_info
+    except Exception as e:
+        print(f"Error getting GPU info: {e}")
+        return []
+
+# TODO
+def print_all_gpus():
+    gpu_info = get_all_gpus()
+    print("All GPUs on the node:")
+    for gpu in gpu_info:
+        print(gpu)
+
 
 def main() -> None:
+    print_all_gpus()
     set_seed(SEED)
 
     # Parse arguments
