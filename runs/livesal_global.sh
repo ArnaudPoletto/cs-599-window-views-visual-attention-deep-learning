@@ -17,6 +17,6 @@ source /home/poletto/venvs/pdm/bin/activate
 
 cd /home/poletto/code
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-srun python src/livesal/livesal_train.py
+srun python src/livesal/livesal_train.py -c ../configs/livesal/global.yml
 
 
