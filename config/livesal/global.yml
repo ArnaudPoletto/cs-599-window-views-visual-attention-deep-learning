@@ -11,7 +11,11 @@ with_transforms: True
 
 hidden_channels: 64
 output_channels: 1
-with_positional_embeddings: False
+with_absolute_positional_embeddings: False
+with_relative_positional_embeddings: False # Not used
+n_heads: 1 # Not used
+neighbor_radius: 1 # Not used
+n_iterations: 1 # Not used
 with_graph_processing: False
 freeze_encoder: True
 fusion_level: 4
