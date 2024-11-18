@@ -19,6 +19,7 @@ class ImageEncoder(nn.Module):
     def __init__(
         self,
         pretrained: bool = True,
+        freeze: bool = True
     ) -> None:
         """
         Initializes the image encoder.
@@ -35,6 +36,10 @@ class ImageEncoder(nn.Module):
 
         self.feature_channels = [feature_info["num_chs"] for feature_info in self.pnas.feature_info]
         self.feature_sizes = self._get_feature_sizes()
+
+        if freeze:
+            for param in self.pnas.parameters():
+                param.requires_grad = False
 
     def _get_feature_sizes(self) -> List[int]:
         """

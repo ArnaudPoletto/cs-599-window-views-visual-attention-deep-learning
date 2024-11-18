@@ -19,7 +19,7 @@ class ImageDecoder(nn.Module):
     def __init__(
         self,
         features_channels: List[int],  # [96, 270, 1080, 2160, 4320]
-        hidden_channels: List[int],  # [128, 96, 270, 256, 512]
+        hidden_channels: List[int],  # [64, 96, 270, 256, 512]
         features_sizes: List[int],  # [165, 83, 42, 21, 11]
         output_channels: int,
     ) -> None:
@@ -42,7 +42,7 @@ class ImageDecoder(nn.Module):
         in_channels = features_channels[::-1]
         inc_channels = [0] + hidden_channels[::-1]
         out_channels = hidden_channels[::-1]
-        sizes = features_sizes[::-1][1:]
+        sizes = features_sizes[::-1][1:] + [IMAGE_SIZE]
         self.deconvs = nn.ModuleList(
             [
                 nn.Sequential(
@@ -66,19 +66,19 @@ class ImageDecoder(nn.Module):
         )
 
         # The final layer
-        final_in_channels = hidden_channels[0]
+        final_channels = out_channels[-1]
         self.final_layer = nn.Sequential(
             nn.Conv2d(
-                in_channels=final_in_channels,
-                out_channels=final_in_channels,
+                in_channels=final_channels,
+                out_channels=final_channels,
                 kernel_size=3,
                 padding=1,
                 bias=False,
             ),
-            nn.BatchNorm2d(num_features=final_in_channels),
+            nn.BatchNorm2d(num_features=final_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels=final_in_channels,
+                in_channels=final_channels,
                 out_channels=output_channels,
                 kernel_size=3,
                 padding=1,
@@ -97,10 +97,10 @@ class ImageDecoder(nn.Module):
         Returns:
             torch.Tensor: The decoded image.
         """
-        for i, (feature, deconv) in zip(features[::-1], self.deconvs):
+        for i, (feature, deconv) in enumerate(zip(features[::-1], self.deconvs)):
             if i > 0:
-                x = torch.cat((x, feature), 1)
-            x = deconv(x)
+                feature = torch.cat((x, feature), 1)
+            x = deconv(feature)
 
         x = self.final_layer(x)
 

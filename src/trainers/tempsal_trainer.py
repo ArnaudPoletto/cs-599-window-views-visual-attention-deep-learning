@@ -1,7 +1,8 @@
 import torch
 from torch import nn
-from torch.cuda.amp import autocast
 from torch.optim import Optimizer
+from torch.cuda.amp import autocast
+from typing import Dict, Any
 
 from src.trainers.trainer import Trainer
 
@@ -25,6 +26,15 @@ class TempSALTrainer(Trainer):
             use_scaler=use_scaler,
             name=name,
         )
+
+    def _get_wandb_config(self) -> Dict[str, Any]:
+        return {
+            "model_name": self.model.__class__.__name__,
+            "output_channels": self.model.output_channels,
+            "hidden_channels_list": self.model.hidden_channels_list,
+            "freeze_encoder": self.model.freeze_encoder,
+            
+        }
 
     def _get_name(
         self, optimizer: Optimizer, n_epochs: int, learning_rate: float

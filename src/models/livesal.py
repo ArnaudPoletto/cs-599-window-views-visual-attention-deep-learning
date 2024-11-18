@@ -239,10 +239,9 @@ class LiveSAL(nn.Module):
         self.freeze_encoder = freeze_encoder
 
         # Get encoder and freeze weights if needed
-        self.encoder = ImageEncoder()
-        if freeze_encoder:
-            for param in self.encoder.parameters():
-                param.requires_grad = False
+        self.encoder = ImageEncoder(
+            freeze=freeze_encoder,
+        )
 
         # Set fusion level and size
         if fusion_level is None:
