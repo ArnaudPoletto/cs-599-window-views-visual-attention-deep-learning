@@ -29,7 +29,11 @@ from src.config import (
 def get_model(
     hidden_channels: int,
     output_channels: int,
-    with_positional_embeddings: bool,
+    with_absolute_positional_embeddings: bool,
+    with_relative_positional_embeddings: bool,
+    n_heads: int,
+    neighbor_radius: int,
+    n_iterations: int,
     with_graph_processing: bool,
     freeze_encoder: bool,
     fusion_level: int,
@@ -37,7 +41,11 @@ def get_model(
     return LiveSAL(
         hidden_channels=hidden_channels,
         output_channels=output_channels,
-        with_positional_embeddings=with_positional_embeddings,
+        with_absolute_positional_embeddings=with_absolute_positional_embeddings,
+        with_relative_positional_embeddings=with_relative_positional_embeddings,
+        n_heads=n_heads,
+        neighbor_radius=neighbor_radius,
+        n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
         fusion_level=fusion_level,
@@ -129,7 +137,11 @@ def main() -> None:
     with_transforms = bool(config["with_transforms"])
     hidden_channels = int(config["hidden_channels"])
     output_channels = int(config["output_channels"])
-    with_positional_embeddings = bool(config["with_positional_embeddings"])
+    with_absolute_positional_embeddings = bool(config["with_absolute_positional_embeddings"])
+    with_relative_positional_embeddings = bool(config["with_relative_positional_embeddings"])
+    n_heads = int(config["n_heads"])
+    neighbor_radius = int(config["neighbor_radius"])
+    n_iterations = int(config["n_iterations"])
     with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
     fusion_level = int(config["fusion_level"]) if "fusion_level" in config else None
@@ -153,7 +165,11 @@ def main() -> None:
     model = get_model(
         hidden_channels=hidden_channels,
         output_channels=output_channels,
-        with_positional_embeddings=with_positional_embeddings,
+        with_absolute_positional_embeddings=with_absolute_positional_embeddings,
+        with_relative_positional_embeddings=with_relative_positional_embeddings,
+        n_heads=n_heads,
+        neighbor_radius=neighbor_radius,
+        n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
         fusion_level=fusion_level,
