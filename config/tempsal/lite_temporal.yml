@@ -9,5 +9,5 @@ save_model: True
 use_scaler: True
 with_transforms: True
 
-decoder_output_channels: 1
+decoder_output_channels: 5
 freeze_encoder: True
