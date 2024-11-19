@@ -65,7 +65,7 @@ class ImageEncoder(nn.Module):
             List[torch.Tensor]: The features extracted from the image.
         """
         if x.shape[-1] != IMAGE_SIZE or x.shape[-2] != IMAGE_SIZE:
-            raise ValueError(f"❌ Input image size must be {IMAGE_SIZE}x{IMAGE_SIZE}, but got {x.shape[-2]}x{x.shape[-1]}
+            raise ValueError(f"❌ Input image size must be {IMAGE_SIZE}x{IMAGE_SIZE}, but got {x.shape[-2]}x{x.shape[-1]}")
         
         image_features = self.pnas(x)
 
