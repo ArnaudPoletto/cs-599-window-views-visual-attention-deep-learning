@@ -332,6 +332,29 @@ class LiveSAL(nn.Module):
         self.freeze_encoder = freeze_encoder
         self.with_depth_information = with_depth_information
 
+        # Get normalizations
+        self.register_buffer(
+            "image_mean",
+            torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "image_std",
+            torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
+            persistent=False,
+        )
+        if with_depth_information:
+            self.register_buffer(
+                "depth_mean",
+                torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1),
+                persistent=False,
+            )
+            self.register_buffer(
+                "depth_std",
+                torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1),
+                persistent=False,
+            )
+
         # Get encoder and freeze weights if needed
         self.image_encoder = ImageEncoder(
             freeze=freeze_encoder,
@@ -393,23 +416,11 @@ class LiveSAL(nn.Module):
                 for in_ch in self.image_encoder.feature_channels
             ]
         )
-        if with_depth_information:
-            self.depth_projections = nn.ModuleList(
-                [
-                    nn.Conv2d(
-                        in_channels=in_ch,
-                        out_channels=hidden_channels,
-                        kernel_size=1,
-                        bias=False,
-                    )
-                for in_ch in self.depth_encoder.feature_channels
-                ]
-            )
 
         # Fusion layer to combine all features
         fusion_in_channels = hidden_channels * len(self.image_projections)
         if with_depth_information:
-            fusion_in_channels += hidden_channels * len(self.depth_projections)
+            fusion_in_channels += 1
         self.fusion = nn.Sequential(
             nn.Conv2d(
                 in_channels=fusion_in_channels,
@@ -489,6 +500,25 @@ class LiveSAL(nn.Module):
 
         self.sigmoid = nn.Sigmoid()
 
+    def _normalize_input(
+        self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor, is_image: bool
+    ) -> torch.Tensor:
+        if not is_image:
+            batch_size, sequence_length, channels, height, width = x.shape
+            x = x.view(-1, channels, height, width)
+
+        if x.max() > 1.0:
+            x = x / 255.0
+
+        normalized_x = (x - mean) / std
+
+        if not is_image:
+            normalized_x = normalized_x.view(
+                batch_size, sequence_length, channels, height, width
+            )
+
+        return normalized_x
+
     def _get_image_features_list(
         self, x: torch.Tensor, is_image: bool
     ) -> List[torch.Tensor]:
@@ -497,12 +527,13 @@ class LiveSAL(nn.Module):
             batch_size, sequence_length, channels, height, width = x.shape
             x = x.view(-1, channels, height, width)
 
-        # Get image features
-        image_features_list = self.image_encoder(x)
+        # Normalize and get image features
+        x_image = self._normalize_input(x, self.image_mean, self.image_std, is_image)
+        image_features_list = self.image_encoder(x_image)
 
         return image_features_list
 
-    def _get_depth_features_list(
+    def _get_predicted_depth(
         self, x: torch.Tensor, is_image: bool
     ) -> List[torch.Tensor]:
         # Flatten batch_size and sequence_length for video inputs to pass through the
@@ -510,33 +541,30 @@ class LiveSAL(nn.Module):
             batch_size, sequence_length, channels, height, width = x.shape
             x = x.view(-1, channels, height, width)
 
-        # Resize input image
-        x = nn.functional.interpolate(
-            x, size=(256, 256), mode="bilinear", align_corners=False # TODO: remove hardcoded size
+        # Normalize and get depth features
+        x_depth = self._normalize_input(x, self.depth_mean, self.depth_std, is_image)
+        predicted_depth = self.depth_encoder(x_depth).unsqueeze(1)
+
+        # Reshape to original size
+        predicted_depth = nn.functional.interpolate(
+            predicted_depth,
+            size=(x.shape[-2], x.shape[-1]),
+            mode="bilinear",
+            align_corners=False,
         )
 
-        # Get depth features
-        depth_features_list, _ = self.depth_encoder(x)
-
-        print("depth features", [f.shape for f in depth_features_list])
-
-        return depth_features_list
+        return predicted_depth
 
     def _get_projected_features_list(
         self,
         image_features_list: List[torch.Tensor],
-        depth_features_list: Optional[List[torch.Tensor]],
         is_image: bool,
     ) -> List[torch.Tensor]:
         # Get features list
         features_list = image_features_list
-        if depth_features_list is not None:
-            features_list.extend(depth_features_list)
 
         # Get projections
         projections = self.image_projections
-        if depth_features_list is not None:
-            projections.extend(self.depth_projections)
 
         projected_features_list = []
         for features, projection_layer in zip(features_list, projections):
@@ -561,7 +589,10 @@ class LiveSAL(nn.Module):
         return projected_features_list, skip_features_list
 
     def _get_fused_features(
-        self, projected_features_list: List[torch.Tensor], is_image: bool
+        self, 
+        projected_features_list: List[torch.Tensor], 
+        predicted_depth: Optional[torch.Tensor],
+        is_image: bool,
     ) -> torch.Tensor:
         # Resize features to middle scale
         base_size = (self.fusion_size, self.fusion_size)
@@ -575,6 +606,17 @@ class LiveSAL(nn.Module):
                     align_corners=False,
                 )
             resized_features_list.append(features)
+
+        # Add depth information if needed
+        if self.with_depth_information:
+            if predicted_depth.shape[-2:] != base_size:
+                predicted_depth = nn.functional.interpolate(
+                    predicted_depth,
+                    size=base_size,
+                    mode="bilinear",
+                    align_corners=False,
+                )
+            resized_features_list.append(predicted_depth)
 
         # Fuse features
         fused_features = self.fusion(torch.cat(resized_features_list, dim=1))
@@ -713,21 +755,24 @@ class LiveSAL(nn.Module):
         image_features_list = self._get_image_features_list(x, is_image)
 
         # Get depth features if needed
-        depth_features_list = None
+        predicted_depth = None
         if self.with_depth_information:
-            depth_features_list = self._get_depth_features_list(x, is_image)
+            predicted_depth = self._get_predicted_depth(x, is_image)
 
         # Project features and get skip features
         projected_features_list, skip_features_list = self._get_projected_features_list(
             image_features_list=image_features_list,
-            depth_features_list=depth_features_list,
             is_image=is_image,
         )
         del image_features_list
         torch.cuda.empty_cache()
 
         # Fuse features
-        fused_features = self._get_fused_features(projected_features_list, is_image)
+        fused_features = self._get_fused_features(
+            projected_features_list, 
+            predicted_depth,
+            is_image
+            )
         del projected_features_list
         torch.cuda.empty_cache()
 

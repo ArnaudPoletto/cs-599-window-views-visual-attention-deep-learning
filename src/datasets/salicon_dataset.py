@@ -57,8 +57,7 @@ class SaliconDataset(Dataset):
         if self.with_transforms:
             all_transform_replay = self.all_transforms(image=frame)["replay"]
 
-        resize = A.Resize(width=331, height=331)
-        normalize = A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+        resize = A.Resize(width=331, height=331) # TODO: remove hardcoded
 
         transformed_frame = resize(image=frame)["image"]
         if self.with_transforms:
@@ -66,7 +65,6 @@ class SaliconDataset(Dataset):
                 all_transform_replay, image=transformed_frame
             )["image"]
             transformed_frame = self.input_transforms(image=transformed_frame)["image"]
-        transformed_frame = normalize(image=transformed_frame)["image"]
 
         transformed_ground_truths = []
         for ground_truth in ground_truths:
