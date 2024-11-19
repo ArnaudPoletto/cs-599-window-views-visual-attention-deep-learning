@@ -18,4 +18,5 @@ neighbor_radius: 1 # Not used
 n_iterations: 1 # Not used
 with_graph_processing: False
 freeze_encoder: True
+with_depth_information: True
 fusion_level: 4

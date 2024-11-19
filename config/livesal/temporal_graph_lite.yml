@@ -1,9 +1,9 @@
 n_epochs: 5
 learning_rate: 1e-3
 weight_decay: 1e-6
-batch_size: 64
+batch_size: 4
 accumulation_steps: 1
-evaluation_steps: 20
+evaluation_steps: 320
 splits: [0.7, 0.15, 0.15]
 save_model: True
 use_scaler: True
@@ -12,11 +12,11 @@ with_transforms: True
 hidden_channels: 64
 output_channels: 5
 with_absolute_positional_embeddings: True
-with_relative_positional_embeddings: True # Not used
-n_heads: 1 # Not used
-neighbor_radius: 1 # Not used
-n_iterations: 1 # Not used
-with_graph_processing: False
+with_relative_positional_embeddings: True
+n_heads: 1
+neighbor_radius: 1
+n_iterations: 5
+with_graph_processing: True
 freeze_encoder: True
 with_depth_information: True
 fusion_level: 4

@@ -4,6 +4,7 @@ from torch import nn
 from typing import List, Tuple, Optional
 
 from src.models.image_encoder import ImageEncoder
+from src.models.depth_encoder import DepthEncoder
 
 
 class ConvGRU(nn.Module):
@@ -52,207 +53,6 @@ class ConvGRU(nn.Module):
         h_new = (1 - z) * h + z * h_hat
 
         return h_new
-
-
-# class GraphProcessor(nn.Module):
-#     def __init__(
-#         self,
-#         hidden_channels: int,
-#         with_relative_positional_embeddings: bool,
-#         fusion_size: int,
-#         n_iterations: int = GRAPH_PROCESSOR_N_ITERATIONS,
-#     ):
-#         super(GraphProcessor, self).__init__()
-
-#         self.hidden_channels = hidden_channels
-#         self.with_relative_positional_embeddings = with_relative_positional_embeddings
-#         self.n_iterations = n_iterations
-#         self.scale = hidden_channels**-0.5
-
-#         self.intra_norm = nn.LayerNorm([hidden_channels, fusion_size, fusion_size])
-#         self.intra_key_conv = nn.Conv2d(
-#             in_channels=hidden_channels,
-#             out_channels=hidden_channels,
-#             kernel_size=1,
-#             padding=0,
-#             bias=True,
-#         )
-#         self.intra_query_conv = nn.Conv2d(
-#             in_channels=hidden_channels,
-#             out_channels=hidden_channels,
-#             kernel_size=1,
-#             padding=0,
-#             bias=True,
-#         )
-#         self.intra_value_conv = nn.Conv2d(
-#             in_channels=hidden_channels,
-#             out_channels=hidden_channels,
-#             kernel_size=1,
-#             padding=0,
-#             bias=True,
-#         )
-#         self.intra_output = nn.Sequential(
-#             nn.Conv2d(
-#                 in_channels=hidden_channels,
-#                 out_channels=hidden_channels,
-#                 kernel_size=1,
-#                 padding=0,
-#                 bias=True,
-#             ),
-#             nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
-#             nn.ReLU(inplace=True),
-#         )
-#         self.intra_alpha = nn.Parameter(torch.tensor(1.0))
-
-#         self.inter_norm = nn.LayerNorm([hidden_channels, fusion_size, fusion_size])
-#         if with_relative_positional_embeddings:
-#             self.relative_positional_embeddings = nn.Parameter(
-#                 torch.randn(2, 1, fusion_size, fusion_size)
-#             )
-#         inter_message_edge_in_channels = hidden_channels + 2 + (1 * with_relative_positional_embeddings)
-#         self.inter_message_edge_conv = nn.Conv2d(
-#             in_channels=inter_message_edge_in_channels,
-#             out_channels=hidden_channels,
-#             kernel_size=1,
-#             padding=0,
-#             bias=True,
-#         )
-#         self.inter_weight = nn.Linear(hidden_channels, hidden_channels, bias=False),
-#         self.inter_gate_conv = nn.Sequential(
-#             nn.Conv2d(
-#                 in_channels=hidden_channels * 2,
-#                 out_channels=hidden_channels,
-#                 kernel_size=1,
-#                 padding=0,
-#                 bias=True,
-#             ),
-#             nn.AdaptiveAvgPool2d(1),
-#             nn.Sigmoid(),
-#         )
-#         self.inter_output = nn.Sequential(
-#             nn.Conv2d(
-#                 in_channels=hidden_channels,
-#                 out_channels=hidden_channels,
-#                 kernel_size=1,
-#                 padding=0,
-#                 bias=True,
-#             ),
-#             nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
-#             nn.ReLU(inplace=True),
-#         )
-
-#         self.intra_inter_alpha = nn.Parameter(torch.tensor(0.5))
-
-#         self.gru = ConvGRU(
-#             input_channels=hidden_channels,
-#             hidden_channels=hidden_channels,
-#             kernel_size=3,
-#             padding=1,
-#         )
-
-#         self.norm = nn.LayerNorm(
-#             [hidden_channels, 11, 11]
-#         )  # TODO: remove hardocded size
-
-#     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
-#         batch_size, channels, height, width = x.shape
-#         x = self.intra_norm(x)
-
-#         query = self.intra_query_conv(x).view(batch_size, channels, -1)
-#         key = self.intra_key_conv(x).view(batch_size, channels, -1)
-#         value = self.intra_value_conv(x).view(batch_size, channels, -1)
-
-#         attention = torch.bmm(query.transpose(1, 2), key) * self.scale
-#         attention = torch.softmax(attention, dim=-1)
-
-#         output = torch.bmm(attention, value.transpose(1, 2))
-#         output = output.transpose(1, 2).view(batch_size, channels, height, width)
-#         output = self.intra_output(output)
-#         output = self.intra_alpha * output + x
-
-#         return output
-    
-#     def _get_temporal_encoding(self, relative_position: int, is_future: bool, device: torch.device) -> torch.Tensor:
-#         direction = torch.tensor(1.0 if is_future else -1.0, device=device)
-#         distance = torch.tensor(float(abs(relative_position)), device=device)
-#         temporal_information = torch.stack([direction, distance])
-        
-#         return temporal_information
-
-#     def _compute_inter_attention(
-#         self, i: int, x: torch.Tensor, neighbors: List[Tuple[int, torch.Tensor]]
-#     ) -> torch.Tensor:
-#         batch_size, channels, height, width = x.shape
-#         x = self.inter_norm(x)
-
-#         messages = []
-#         gates = []
-#         for j, y in neighbors:
-#             index = int(i-j > 0)
-#             is_future = i < j
-#             # Add temporal encoding
-#             temporal_encoding = self._get_temporal_encoding(i-j, is_future, x.device)
-#             temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(batch_size, -1, height, width)
-#             y = torch.cat([y, temporal_encoding], dim=1)
-
-#             # Add relative positional embeddings
-#             if self.with_relative_positional_embeddings:
-#                 spatial_encoding = self.relative_positional_embeddings[index].expand(
-#                     batch_size, -1, -1, -1
-#                 )
-#                 y = torch.cat([y, spatial_encoding], dim=1)
-
-#             y = self.inter_message_edge_conv(y)
-#             y = y.view(batch_size, channels, -1)
-#             y = self.inter_weight(y.transpose(1, 2)).transpose(1, 2)
-
-#             e = torch.bmm(x.view(batch_size, channels, -1).transpose(1, 2), y)
-#             e = torch.softmax(e, dim=-1)
-
-#             message = (
-#                 torch.bmm(e, y.transpose(1, 2))
-#                 .transpose(1, 2)
-#                 .view(batch_size, channels, height, width)
-#             )
-#             message = self.inter_output(message)
-#             gate = self.inter_gate_conv(torch.cat([x, message], dim=1))
-
-#             messages.append(message)
-#             gates.append(gate)
-
-#         if messages:
-#             messages = torch.stack(messages, dim=0)
-#             gates = torch.stack(gates, dim=0)
-#             gated_messages = messages * gates
-#             output = torch.sum(gated_messages, dim=0)
-#         else:
-#             output = torch.zeros_like(x)
-
-#         return output
-
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         sequence_length, batch_size, channels, height, width = x.shape
-#         h = x
-#         for _ in range(self.n_iterations):
-#             new_h = []
-#             for i in range(sequence_length):
-#                 intra_output = self._compute_intra_attention(h[i])
-
-#                 neighbors = [(j, h[j]) for j in range(sequence_length) if abs(i - j) == 1]
-#                 inter_output = self._compute_inter_attention(i, h[i], neighbors)
-#                 combined_message = (
-#                     self.intra_inter_alpha * intra_output + (1 - self.intra_inter_alpha) * inter_output
-#                 )
-
-#                 next_h = self.gru(combined_message, h[i])
-#                 next_h = next_h + h[i]
-#                 next_h = self.norm(next_h)
-#                 new_h.append(next_h)
-
-#             h = torch.stack(new_h, dim=0)
-
-#         return h
-    
 
 
 class GraphProcessor(nn.Module):
@@ -320,7 +120,9 @@ class GraphProcessor(nn.Module):
             self.relative_positional_embeddings = nn.Parameter(
                 torch.randn(2 * neighbor_radius, 1, fusion_size, fusion_size)
             )
-        inter_message_edge_in_channels = hidden_channels + 2 + (1 * with_relative_positional_embeddings)
+        inter_message_edge_in_channels = (
+            hidden_channels + 2 + (1 * with_relative_positional_embeddings)
+        )
         self.inter_message_edge_conv = nn.Conv2d(
             in_channels=inter_message_edge_in_channels,
             out_channels=hidden_channels,
@@ -383,7 +185,7 @@ class GraphProcessor(nn.Module):
 
         self.norm = nn.LayerNorm(
             [hidden_channels, 11, 11]
-        )  # TODO: remove hardocded size
+        )  # TODO: remove hardocded size, fusion_size?
 
     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, channels, height, width = x.shape
@@ -402,12 +204,14 @@ class GraphProcessor(nn.Module):
         output = self.intra_alpha * output + x
 
         return output
-    
-    def _get_temporal_encoding(self, relative_position: int, is_future: bool, device: torch.device) -> torch.Tensor:
+
+    def _get_temporal_encoding(
+        self, relative_position: int, is_future: bool, device: torch.device
+    ) -> torch.Tensor:
         direction = torch.tensor(1.0 if is_future else -1.0, device=device)
         distance = torch.tensor(float(abs(relative_position)), device=device)
         temporal_information = torch.stack([direction, distance])
-        
+
         return temporal_information
 
     def _compute_inter_attention(
@@ -423,9 +227,13 @@ class GraphProcessor(nn.Module):
             is_future = i < j
 
             # Add temporal encoding
-            relative_position = (i - j) / self.neighbor_radius 
-            temporal_encoding = self._get_temporal_encoding(relative_position, is_future, x.device)
-            temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(batch_size, -1, height, width)
+            relative_position = (i - j) / self.neighbor_radius
+            temporal_encoding = self._get_temporal_encoding(
+                relative_position, is_future, x.device
+            )
+            temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(
+                batch_size, -1, height, width
+            )
             y = torch.cat([y, temporal_encoding], dim=1)
 
             # Add relative positional embeddings
@@ -436,9 +244,15 @@ class GraphProcessor(nn.Module):
                 y = torch.cat([y, spatial_encoding], dim=1)
             y = self.inter_message_edge_conv(y)
 
-            query = self.inter_query_conv(x).view(batch_size, self.n_heads, self.head_dim, -1)
-            key = self.inter_key_conv(y).view(batch_size, self.n_heads, self.head_dim, -1)
-            value = self.inter_value_conv(y).view(batch_size, self.n_heads, self.head_dim, -1)
+            query = self.inter_query_conv(x).view(
+                batch_size, self.n_heads, self.head_dim, -1
+            )
+            key = self.inter_key_conv(y).view(
+                batch_size, self.n_heads, self.head_dim, -1
+            )
+            value = self.inter_value_conv(y).view(
+                batch_size, self.n_heads, self.head_dim, -1
+            )
 
             attention = torch.matmul(query.transpose(2, 3), key) * self.scale
             attention = torch.softmax(attention, dim=-1)
@@ -469,10 +283,15 @@ class GraphProcessor(nn.Module):
             for i in range(sequence_length):
                 intra_output = self._compute_intra_attention(h[i])
 
-                neighbors = [(j, h[j]) for j in range(sequence_length) if i != j and abs(i - j) <= self.neighbor_radius]
+                neighbors = [
+                    (j, h[j])
+                    for j in range(sequence_length)
+                    if i != j and abs(i - j) <= self.neighbor_radius
+                ]
                 inter_output = self._compute_inter_attention(i, h[i], neighbors)
                 combined_message = (
-                    self.intra_inter_alpha * intra_output + (1 - self.intra_inter_alpha) * inter_output
+                    self.intra_inter_alpha * intra_output
+                    + (1 - self.intra_inter_alpha) * inter_output
                 )
 
                 next_h = self.gru(combined_message, h[i])
@@ -497,6 +316,7 @@ class LiveSAL(nn.Module):
         n_iterations: int,
         with_graph_processing: bool,
         freeze_encoder: bool,
+        with_depth_information: bool,
         fusion_level: Optional[int] = None,
     ):
         super(LiveSAL, self).__init__()
@@ -510,30 +330,35 @@ class LiveSAL(nn.Module):
         self.n_iterations = n_iterations
         self.with_graph_processing = with_graph_processing
         self.freeze_encoder = freeze_encoder
+        self.with_depth_information = with_depth_information
 
         # Get encoder and freeze weights if needed
-        self.encoder = ImageEncoder(
+        self.image_encoder = ImageEncoder(
             freeze=freeze_encoder,
         )
+        if with_depth_information:
+            self.depth_encoder = DepthEncoder(
+                freeze=freeze_encoder,
+            )
 
         # Set fusion level and size
         if fusion_level is None:
-            fusion_level = len(self.encoder.feature_sizes) // 2
+            fusion_level = len(self.image_encoder.feature_sizes) // 2
             print(f"➡️ Default fusion level set to {fusion_level}.")
         if fusion_level < 0:
             raise ValueError(
                 f"❌ Fusion level must be greater than or equal to 0, got {fusion_level}."
             )
-        if fusion_level >= len(self.encoder.feature_sizes):
+        if fusion_level >= len(self.image_encoder.feature_sizes):
             raise ValueError(
-                f"❌ Fusion level must be less than {len(self.encoder.feature_sizes)}, got {fusion_level}."
+                f"❌ Fusion level must be less than {len(self.image_encoder.feature_sizes)}, got {fusion_level}."
             )
         self.fusion_level = fusion_level
-        self.fusion_size = self.encoder.feature_sizes[self.fusion_level]
+        self.fusion_size = self.image_encoder.feature_sizes[self.fusion_level]
 
         # Projection layers to project encoded features to a common space
         # Add 2 spatial awareness layers with depthwise separable 3x3 conv for efficiency
-        self.projection_layers = nn.ModuleList(
+        self.image_projections = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
@@ -565,16 +390,32 @@ class LiveSAL(nn.Module):
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
                 )
-                for in_ch in self.encoder.feature_channels
+                for in_ch in self.image_encoder.feature_channels
             ]
         )
+        if with_depth_information:
+            self.depth_projections = nn.ModuleList(
+                [
+                    nn.Conv2d(
+                        in_channels=in_ch,
+                        out_channels=hidden_channels,
+                        kernel_size=1,
+                        bias=False,
+                    )
+                for in_ch in self.depth_encoder.feature_channels
+                ]
+            )
 
         # Fusion layer to combine all features
+        fusion_in_channels = hidden_channels * len(self.image_projections)
+        if with_depth_information:
+            fusion_in_channels += hidden_channels * len(self.depth_projections)
         self.fusion = nn.Sequential(
             nn.Conv2d(
-                in_channels=hidden_channels * 5,
+                in_channels=fusion_in_channels,
                 out_channels=hidden_channels,
                 kernel_size=1,
+                padding=0,
                 bias=False,
             ),
             nn.BatchNorm2d(hidden_channels),
@@ -648,24 +489,61 @@ class LiveSAL(nn.Module):
 
         self.sigmoid = nn.Sigmoid()
 
-    def _get_features_list(self, x: torch.Tensor, is_image: bool) -> List[torch.Tensor]:
+    def _get_image_features_list(
+        self, x: torch.Tensor, is_image: bool
+    ) -> List[torch.Tensor]:
         # Flatten batch_size and sequence_length for video inputs to pass through the encoder
         if not is_image:
             batch_size, sequence_length, channels, height, width = x.shape
             x = x.view(-1, channels, height, width)
 
-        # Get multi-scale features
-        features_list = self.encoder(x)
+        # Get image features
+        image_features_list = self.image_encoder(x)
 
-        return features_list
+        return image_features_list
+
+    def _get_depth_features_list(
+        self, x: torch.Tensor, is_image: bool
+    ) -> List[torch.Tensor]:
+        # Flatten batch_size and sequence_length for video inputs to pass through the
+        if not is_image:
+            batch_size, sequence_length, channels, height, width = x.shape
+            x = x.view(-1, channels, height, width)
+
+        # Resize input image
+        x = nn.functional.interpolate(
+            x, size=(256, 256), mode="bilinear", align_corners=False
+        )
+
+        # Get depth features
+        print("x before depth", x.shape)
+        depth_features_list, _ = self.depth_encoder(x)
+
+        print("depth_features_list", [f.shape for f in depth_features_list])
+
+        return depth_features_list
 
     def _get_projected_features_list(
         self,
-        features_list: List[torch.Tensor],
+        image_features_list: List[torch.Tensor],
+        depth_features_list: Optional[List[torch.Tensor]],
         is_image: bool,
     ) -> List[torch.Tensor]:
+        # Get features list
+        features_list = image_features_list
+        if depth_features_list is not None:
+            features_list.extend(depth_features_list)
+
+        # Get projections
+        projections = self.image_projections
+        if depth_features_list is not None:
+            projections.extend(self.depth_projections)
+
         projected_features_list = []
-        for features, projection_layer in zip(features_list, self.projection_layers):
+        for features, projection_layer in zip(features_list, projections):
+            print("features", features.shape)
+            print("projection_layer", projection_layer)
+            print("+++++++++++++++++++++++++++++++++++++++++++++")
             projected_features = projection_layer(features)
             projected_features_list.append(projected_features)
 
@@ -720,14 +598,16 @@ class LiveSAL(nn.Module):
 
         return fused_features
 
-    def _add_absolute_positional_embeddings(self, fused_features: torch.Tensor) -> torch.Tensor:
+    def _add_absolute_positional_embeddings(
+        self, fused_features: torch.Tensor
+    ) -> torch.Tensor:
         batch_size_sequence_length, channels, height, width = fused_features.shape
         fused_features_list = fused_features.view(
             -1, self.output_channels, channels, height, width
         )
-        fused_features = (fused_features_list + self.absolute_positional_embeddings.unsqueeze(0)).view(
-            batch_size_sequence_length, channels, height, width
-        )
+        fused_features = (
+            fused_features_list + self.absolute_positional_embeddings.unsqueeze(0)
+        ).view(batch_size_sequence_length, channels, height, width)
 
         return fused_features
 
@@ -833,14 +713,21 @@ class LiveSAL(nn.Module):
             )
         is_image = x.dim() == 4
 
-        # Get multi-scale features
-        features_list = self._get_features_list(x, is_image)
+        # Get image features
+        image_features_list = self._get_image_features_list(x, is_image)
+
+        # Get depth features if needed
+        depth_features_list = None
+        if self.with_depth_information:
+            depth_features_list = self._get_depth_features_list(x, is_image)
 
         # Project features and get skip features
         projected_features_list, skip_features_list = self._get_projected_features_list(
-            features_list, is_image
+            image_features_list=image_features_list,
+            depth_features_list=depth_features_list,
+            is_image=is_image,
         )
-        del features_list
+        del image_features_list
         torch.cuda.empty_cache()
 
         # Fuse features

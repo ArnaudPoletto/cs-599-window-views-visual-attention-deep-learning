@@ -36,6 +36,7 @@ def get_model(
     n_iterations: int,
     with_graph_processing: bool,
     freeze_encoder: bool,
+    with_depth_information: bool,
     fusion_level: int,
 ) -> nn.Module:
     return LiveSAL(
@@ -48,6 +49,7 @@ def get_model(
         n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
+        with_depth_information=with_depth_information,
         fusion_level=fusion_level,
     ).to(DEVICE)
 
@@ -144,6 +146,7 @@ def main() -> None:
     n_iterations = int(config["n_iterations"])
     with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
+    with_depth_information = bool(config["with_depth_information"])
     fusion_level = int(config["fusion_level"]) if "fusion_level" in config else None
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
@@ -172,6 +175,7 @@ def main() -> None:
         n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
+        with_depth_information=with_depth_information,
         fusion_level=fusion_level,
     )
     criterion = get_criterion()
