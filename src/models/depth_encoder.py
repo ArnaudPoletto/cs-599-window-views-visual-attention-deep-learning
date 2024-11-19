@@ -7,7 +7,7 @@ from transformers import AutoModelForDepthEstimation
 MODEL_NAME = "depth-anything/Depth-Anything-V2-Base-hf"
 HIDDEN_LAYER_INDICES = [0, 6, 12]
 IMAGE_SIZE = 256
-HIDDEN_DIMENSION = 768
+HIDDEN_DIMENSION = 972
 FEATURE_SIZE = 16
 
 class DepthEncoder(nn.Module):

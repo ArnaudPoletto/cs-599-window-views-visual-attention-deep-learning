@@ -512,14 +512,13 @@ class LiveSAL(nn.Module):
 
         # Resize input image
         x = nn.functional.interpolate(
-            x, size=(256, 256), mode="bilinear", align_corners=False
+            x, size=(256, 256), mode="bilinear", align_corners=False # TODO: remove hardcoded size
         )
 
         # Get depth features
-        print("x before depth", x.shape)
         depth_features_list, _ = self.depth_encoder(x)
 
-        print("depth_features_list", [f.shape for f in depth_features_list])
+        print("depth features", [f.shape for f in depth_features_list])
 
         return depth_features_list
 
@@ -541,9 +540,6 @@ class LiveSAL(nn.Module):
 
         projected_features_list = []
         for features, projection_layer in zip(features_list, projections):
-            print("features", features.shape)
-            print("projection_layer", projection_layer)
-            print("+++++++++++++++++++++++++++++++++++++++++++++")
             projected_features = projection_layer(features)
             projected_features_list.append(projected_features)
 
