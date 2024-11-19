@@ -428,43 +428,11 @@ class LiveSAL(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        if with_depth_information:
-            self.depth_projection = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=1,
-                    out_channels=hidden_channels,
-                    kernel_size=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels,
-                    kernel_size=3,
-                    padding=1,
-                    groups=hidden_channels,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels,
-                    kernel_size=3,
-                    padding=1,
-                    groups=hidden_channels,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels),
-                nn.ReLU(inplace=True),
-            )
-
         # Fusion layer to combine all features
         if with_depth_information:
             self.modal_fusion = nn.Sequential(
                 nn.Conv2d(
-                    in_channels=hidden_channels * 2,
+                    in_channels=hidden_channels + 1,
                     out_channels=hidden_channels,
                     kernel_size=1,
                     padding=0,
@@ -631,20 +599,10 @@ class LiveSAL(nn.Module):
 
         return projected_features_list, skip_features_list
 
-    def _get_projected_depth_features(
-        self,
-        depth_features: torch.Tensor,
-        is_image: bool,
-    ) -> torch.Tensor:
-        # Get projected depth features
-        projected_depth_features = self.depth_projection(depth_features)
-
-        return projected_depth_features
-
     def _get_fused_features(
         self,
         projected_image_features_list: List[torch.Tensor],
-        projected_depth_features: Optional[torch.Tensor],
+        depth_features: Optional[torch.Tensor],
         is_image: bool,
     ) -> torch.Tensor:
         # Resize features to middle scale
@@ -667,14 +625,14 @@ class LiveSAL(nn.Module):
 
         # Add depth information if needed
         if self.with_depth_information:
-            if projected_depth_features.shape[-2:] != base_size:
-                projected_depth_features = nn.functional.interpolate(
-                    projected_depth_features,
+            if depth_features.shape[-2:] != base_size:
+                depth_features = nn.functional.interpolate(
+                    depth_features,
                     size=base_size,
                     mode="bilinear",
                     align_corners=False,
                 )
-            fused_features_list.append(projected_depth_features)
+            fused_features_list.append(depth_features)
 
         # Fuse features
         fused_features = self.modal_fusion(torch.cat(fused_features_list, dim=1))
@@ -688,11 +646,6 @@ class LiveSAL(nn.Module):
             fused_features = fused_features.view(
                 batch_size * self.output_channels, channels, height, width
             )
-
-        del resized_image_features_list
-        if self.with_depth_information:
-            del projected_depth_features
-        torch.cuda.empty_cache()
 
         return fused_features
 
@@ -828,20 +781,16 @@ class LiveSAL(nn.Module):
         depth_features = None
         if self.with_depth_information:
             depth_features = self._get_depth_features(x, is_image)
-            projected_depth_features = self._get_projected_depth_features(
-                depth_features=depth_features,
-                is_image=is_image,
-            )
 
         # Fuse features
         fused_features = self._get_fused_features(
             projected_image_features_list=projected_image_features_list, 
-            projected_depth_features=projected_depth_features, 
+            depth_features=depth_features, 
             is_image=is_image,
         )
         del projected_image_features_list
         if self.with_depth_information:
-            del projected_depth_features
+            del depth_features
         torch.cuda.empty_cache()
 
         # Add frame embeddings if needed
