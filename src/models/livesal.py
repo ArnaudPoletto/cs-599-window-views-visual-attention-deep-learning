@@ -451,12 +451,15 @@ class LiveSAL(nn.Module):
             )
 
         # Decoder layers
+        decoder_in_channels = hidden_channels * 2
+        if with_depth_information:
+            decoder_in_channels += 1
         self.decoder = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
-                        hidden_channels * 2,
-                        hidden_channels,
+                        in_channels=decoder_in_channels,
+                        out_channels=hidden_channels,
                         kernel_size=3,
                         padding=1,
                         bias=False,
@@ -464,8 +467,8 @@ class LiveSAL(nn.Module):
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
                     nn.Conv2d(
-                        hidden_channels,
-                        hidden_channels,
+                        in_channels=hidden_channels,
+                        out_channels=hidden_channels,
                         kernel_size=3,
                         padding=1,
                         bias=False,
@@ -558,6 +561,7 @@ class LiveSAL(nn.Module):
     def _get_projected_image_features_list(
         self,
         image_features_list: List[torch.Tensor],
+        depth_features: Optional[torch.Tensor],
         is_image: bool,
     ) -> List[torch.Tensor]:
         # Get features list
@@ -571,8 +575,24 @@ class LiveSAL(nn.Module):
             projected_features = projection_layer(features)
             projected_image_features_list.append(projected_features)
 
-        # Get skip features, and repeat image skip features for graph processing
+        # Get skip features
         skip_features_list = projected_image_features_list[: self.fusion_level]
+        
+        # Add depth information if needed
+        if self.with_depth_information:
+            new_skip_features_list = []
+            for skip_features in skip_features_list:
+                if depth_features.shape[-2:] != skip_features.shape[-2:]:
+                    depth_features = nn.functional.interpolate(
+                        depth_features,
+                        size=skip_features.shape[-2:],
+                        mode="bilinear",
+                        align_corners=False,
+                    )
+                new_skip_features_list.append(torch.cat([skip_features, depth_features], dim=1))
+            skip_features_list = new_skip_features_list
+
+        # Repeat image skip features for graph processing
         if is_image:
             resized_skip_features_list = []
             for skip_features in skip_features_list:
@@ -762,6 +782,7 @@ class LiveSAL(nn.Module):
         # Project features and get skip features
         projected_image_features_list, skip_features_list = self._get_projected_image_features_list(
             image_features_list=image_features_list,
+            depth_features=depth_features,
             is_image=is_image,
         )
         del image_features_list
@@ -786,7 +807,9 @@ class LiveSAL(nn.Module):
 
         # Decode features
         decoded_features_list = self._decode_features(
-            fused_features, skip_features_list, is_image
+            fused_features=fused_features, 
+            skip_features_list=skip_features_list, 
+            is_image=is_image
         )
         del fused_features
         torch.cuda.empty_cache()
