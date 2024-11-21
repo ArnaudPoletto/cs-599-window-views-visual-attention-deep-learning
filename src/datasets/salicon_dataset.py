@@ -103,6 +103,9 @@ class SaliconDataset(Dataset):
         else:
             global_ground_truth = (global_ground_truth - min_val) / (max_val - min_val)
 
+        # TODO: remove this
+        ground_truths = ground_truths.unsqueeze(0).expand(5, -1, -1, -1)
+
         return frame, ground_truths, global_ground_truth
     
 
