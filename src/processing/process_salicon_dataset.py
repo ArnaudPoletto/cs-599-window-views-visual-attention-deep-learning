@@ -85,8 +85,8 @@ def get_saliency_map(
     end_frame: int,
     kde_bandwidth: float,
     min_n_fixations: int,
-    width: int = SALICON_WIDTH,
     height: int = SALICON_HEIGHT,
+    width: int = SALICON_WIDTH,
 ) -> np.ndarray:
     """
     Get the saliency map from the fixation data.
@@ -152,8 +152,6 @@ def get_saliency_map(
 
 def get_subject_fixation_data(
     subject_df: pd.DataFrame,
-    sample_id: int,
-    subject_id: int,
     group_start_timestamp: int,
     dispersion_threshold_px: int,
     duration_threshold_ms: int,
@@ -208,14 +206,9 @@ def get_subject_fixation_data(
         if is_fixation:
             subject_fixation_data.append(
                 {
-                    "SampleId": sample_id,
-                    "SubjectId": subject_id,
+                    "TimeSinceStart_ms": time_since_start,
                     "X_px": subject_df["X_px"].iloc[start_index:curr_index].mean(),
                     "Y_px": subject_df["Y_px"].iloc[start_index:curr_index].mean(),
-                    "StartTimestamp_ns": start_timestamp,
-                    "EndTimestamp_ns": end_timestamp,
-                    "Duration_ns": fixation_duration,
-                    "TimeSinceStart_ms": time_since_start,
                 }
             )
         start_index = curr_index
@@ -224,7 +217,7 @@ def get_subject_fixation_data(
     return subject_fixation_data
 
 
-def process_single_file(
+def process_sample(
     gaze_file_path: str,
     dispersion_threshold_px: int,
     duration_threshold_ms: int,
@@ -232,7 +225,7 @@ def process_single_file(
     kde_bandwidth: float,
 ) -> None:
     """
-    Process a single gaze file.
+    Process a single sample.
 
     Args:
         gaze_file_path (str): The gaze file path.
@@ -257,8 +250,6 @@ def process_single_file(
         subject_locations, subject_timestamps, _ = gaze_subject
         subject_df = pd.DataFrame(
             {
-                "SampleId": sample_id,
-                "SubjectId": subject_id,
                 "Timestamp_ms": subject_timestamps[:, 0],
                 "X_px": subject_locations[:, 0],
                 "Y_px": subject_locations[:, 1],
@@ -270,8 +261,6 @@ def process_single_file(
         # Process fixations for this subject
         subject_fixation_data = get_subject_fixation_data(
             subject_df=subject_df,
-            sample_id=sample_id,
-            subject_id=subject_id,
             group_start_timestamp=group_start_timestamp,
             dispersion_threshold_px=dispersion_threshold_px,
             duration_threshold_ms=duration_threshold_ms,
@@ -368,11 +357,13 @@ def main():
         shutil.rmtree(PROCESSED_SALICON_PATH)
         print("✅ Deleted existing salicon ground truths.")
 
+    # Get gaze file paths for each sample
     gaze_file_paths = get_paths_recursive(
         folder_path=RAW_SALICON_GAZES_PATH, match_pattern="*.mat", file_type="f"
     )
-    num_workers = max(1, multiprocessing.cpu_count() - 1)
 
+    # Process fixations
+    num_workers = max(1, multiprocessing.cpu_count() - 1)
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         args = [
             (
@@ -384,7 +375,7 @@ def main():
             )
             for gaze_file_path in gaze_file_paths
         ]
-        futures = executor.map(process_single_file, *zip(*args))
+        futures = executor.map(process_sample, *zip(*args))
         for _ in tqdm(
             futures, total=len(gaze_file_paths), desc="⌛ Processing fixations..."
         ):

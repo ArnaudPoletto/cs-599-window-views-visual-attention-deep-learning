@@ -436,7 +436,7 @@ class LiveSAL(nn.Module):
         if with_absolute_positional_embeddings:
             self.absolute_positional_embeddings = nn.Parameter(
                 torch.randn(
-                    output_channels, hidden_channels, self.fusion_size, self.fusion_size
+                    output_channels, 1, self.fusion_size, self.fusion_size# TODO: hidden channels or 1?
                 )
             )
 
