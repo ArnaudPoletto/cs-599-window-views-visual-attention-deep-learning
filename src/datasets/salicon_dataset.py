@@ -8,10 +8,9 @@ import cv2
 import numpy as np
 from PIL import Image
 import albumentations as A
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from torch.utils.data import Dataset, DataLoader
 
-from src.utils.frame import Frame
 from src.utils.random import set_seed
 from src.utils.file import get_paths_recursive
 
@@ -52,7 +51,7 @@ class SaliconDataset(Dataset):
     def __len__(self) -> int:
         return len(self.sample_folder_paths)
 
-    def _apply_transforms(self, frame: np.ndarray, ground_truths: np.ndarray) -> Frame:
+    def _apply_transforms(self, frame: np.ndarray, ground_truths: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         # Get transforms to replay
         if self.with_transforms:
             all_transform_replay = self.all_transforms(image=frame)["replay"]
@@ -78,7 +77,7 @@ class SaliconDataset(Dataset):
 
         return transformed_frame, transformed_ground_truths
 
-    def __getitem__(self, index: int) -> Frame:
+    def __getitem__(self, index: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         sample_folder_path = self.sample_folder_paths[index]
         frame_file_path = f"{sample_folder_path}/frame.jpg"
         output_file_paths = get_paths_recursive(
@@ -116,7 +115,7 @@ def get_dataloaders(
     test_split: float,
     train_shuffle: bool,
     n_workers: int,
-    seed: int,
+    seed: Optional[int],
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     if not np.isclose(train_split + val_split + test_split, 1.0):
         raise ValueError(

@@ -7,6 +7,8 @@ sys.path.append(str(GLOBAL_DIR))
 import torch
 import argparse
 import torch.nn as nn
+from typing import Tuple
+from torch.utils.data import DataLoader
 
 from src.utils.random import set_seed
 from src.models.livesal import LiveSAL
@@ -15,7 +17,8 @@ from src.losses.kl_div import KLDivLoss
 from src.losses.combined import CombinedLoss
 from src.utils.file import get_paths_recursive
 from src.trainers.livesal_trainer import LiveSALTrainer
-from src.datasets.salicon_dataset import get_dataloaders
+from src.datasets.salicon_dataset import get_dataloaders as get_salicon_dataloaders
+from src.datasets.dhf1k_dataset import get_dataloaders as get_dhf1k_dataloaders
 from src.losses.correlation_coefficient import CorrelationCoefficientLoss
 from src.config import (
     SEED,
@@ -23,7 +26,50 @@ from src.config import (
     N_WORKERS,
     CONFIG_PATH,
     PROCESSED_SALICON_PATH,
+    PROCESSED_DHF1K_PATH,
 )
+
+def _get_dataloaders(
+    dataset: str,
+    with_transforms: bool,
+    batch_size: int,
+    splits: Tuple[float, float, float],
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    if dataset == "salicon":
+        sample_folder_paths = get_paths_recursive(
+            folder_path=PROCESSED_SALICON_PATH, match_pattern="*", file_type="d"
+        )
+        loaders = get_salicon_dataloaders(
+            sample_folder_paths=sample_folder_paths,
+            with_transforms=with_transforms,
+            batch_size=batch_size,
+            train_split=splits[0],
+            val_split=splits[1],
+            test_split=splits[2],
+            train_shuffle=True,
+            n_workers=N_WORKERS,
+            seed=SEED,
+        )
+    elif dataset == "dhf1k":
+        sample_folder_paths = get_paths_recursive(
+            folder_path=PROCESSED_DHF1K_PATH, match_pattern="*", file_type="d"
+        )
+        loaders = get_dhf1k_dataloaders(
+            sample_folder_paths=sample_folder_paths,
+            sequence_length=5, # TODO: remove hardocded value
+            with_transforms=with_transforms,
+            batch_size=batch_size,
+            train_split=splits[0],
+            val_split=splits[1],
+            test_split=splits[2],
+            train_shuffle=True,
+            n_workers=N_WORKERS,
+            seed=SEED,
+        )
+    else:
+        raise ValueError(f"❌ Invalid dataset: {dataset}")
+
+    return loaders
 
 
 def get_model(
@@ -127,6 +173,7 @@ def main() -> None:
 
     # Get config parameters
     config = get_config(config_file_path)
+    dataset = config["dataset"]
     n_epochs = int(config["n_epochs"])
     learning_rate = float(config["learning_rate"])
     weight_decay = float(config["weight_decay"])
@@ -151,19 +198,11 @@ def main() -> None:
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataloaders, model, criterion, optimizer, and trainer
-    sample_folder_paths = get_paths_recursive(
-        folder_path=PROCESSED_SALICON_PATH, match_pattern="*", file_type="d"
-    )
-    train_loader, val_loader, _ = get_dataloaders(
-        sample_folder_paths=sample_folder_paths,
+    train_loader, val_loader, _ = _get_dataloaders(
+        dataset=dataset,
         with_transforms=with_transforms,
         batch_size=batch_size,
-        train_split=splits[0],
-        val_split=splits[1],
-        test_split=splits[2],
-        train_shuffle=True,
-        n_workers=N_WORKERS,
-        seed=SEED,
+        splits=splits,
     )
     model = get_model(
         hidden_channels=hidden_channels,

@@ -506,19 +506,10 @@ class LiveSAL(nn.Module):
     def _normalize_input(
         self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor, is_image: bool
     ) -> torch.Tensor:
-        if not is_image:
-            batch_size, sequence_length, channels, height, width = x.shape
-            x = x.view(-1, channels, height, width)
-
         if x.max() > 1.0:
             x = x / 255.0
-
+            
         normalized_x = (x - mean) / std
-
-        if not is_image:
-            normalized_x = normalized_x.view(
-                batch_size, sequence_length, channels, height, width
-            )
 
         return normalized_x
 
@@ -770,6 +761,8 @@ class LiveSAL(nn.Module):
                 f"❌ Input tensor must have {self.output_channels} channels, got {x.shape[1]}."
             )
         is_image = x.dim() == 4
+
+        print(">>>", x.shape)
 
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
