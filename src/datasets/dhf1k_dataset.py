@@ -194,12 +194,12 @@ def get_dataloaders(
     val_dataset = DHF1KDataset(
         sample_folder_paths=[sample_folder_paths[i] for i in val_indices],
         sequence_length=sequence_length,
-        with_transforms=with_transforms,
+        with_transforms=False,
     )
     test_dataset = DHF1KDataset(
         sample_folder_paths=[sample_folder_paths[i] for i in test_indices],
         sequence_length=sequence_length,
-        with_transforms=with_transforms,
+        with_transforms=False,
     )
 
     train_loader = DataLoader(  
