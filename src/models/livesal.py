@@ -752,10 +752,6 @@ class LiveSAL(nn.Module):
             raise ValueError(
                 f"❌ Input tensor must be of shape (batch_size, channels, height, width) or (batch_size, sequence_length, channels, height, width), got {x.shape}."
             )
-        if not self.with_graph_processing and x.dim() == 5:
-            raise ValueError(
-                "❌ Model was not initialized with graph processing, but input is of shape (batch_size, sequence_length, channels, height, width)."
-            )
         if x.dim() == 5 and x.shape[1] != self.output_channels:
             raise ValueError(
                 f"❌ Input tensor must have {self.output_channels} channels, got {x.shape[1]}."
