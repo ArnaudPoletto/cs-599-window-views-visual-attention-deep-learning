@@ -190,7 +190,7 @@ class ViDaSEncoder(nn.Module):
             raise ValueError(
                 f"❌ Input tensor has shape {x.shape[2:]}, expected {self.input_shape}."
             )
-        
+
         saliency_maps_list = []
         for encoder_block, dsam in zip(self.encoder_blocks, self.dsams):
             x = encoder_block(x)
@@ -253,7 +253,7 @@ class ViDaS(nn.Module):
         use_max_poolings: List[bool],
         saliency_out_channels: int,
         attention_out_channels: int,
-        with_depth_information: bool
+        with_depth_information: bool,
     ) -> None:
         super(ViDaS, self).__init__()
 
@@ -267,7 +267,7 @@ class ViDaS(nn.Module):
         self.attention_out_channels = attention_out_channels
         self.with_depth_information = with_depth_information
 
-        self.encoder = ViDaSEncoder(
+        self.image_encoder = ViDaSEncoder(
             input_channels=input_channels,
             input_shape=input_shape,
             hidden_channels_list=hidden_channels_list,
@@ -277,12 +277,23 @@ class ViDaS(nn.Module):
             attention_out_channels=attention_out_channels,
         )
         saliency_map_shapes = self.encoder.get_saliency_map_shapes()
-        self.decoder = ViDaSDecoder(
+        self.image_decoder = ViDaSDecoder(
             saliency_map_shapes=saliency_map_shapes,
             saliency_out_channels=saliency_out_channels,
         )
-        self.upsample = nn.Upsample(
+        self.image_upsample = nn.Upsample(
             size=input_shape[1:], mode="bilinear", align_corners=False
+        )
+
+        self.register_buffer(
+            "image_mean",
+            torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "image_std",
+            torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
+            persistent=False,
         )
 
         if with_depth_information:
@@ -344,37 +355,39 @@ class ViDaS(nn.Module):
         self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
     ) -> torch.Tensor:
         if x.max() > 1.0:
-            x = x / 255.0
-            
+            x = x.float() / 255.0
+
         normalized_x = (x - mean) / std
 
         return normalized_x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.with_depth_information:
-            # Estimate depths
+            # Estimate depths and forward depth
             batch_size, sequence_length, channels, height, width = x.shape
             x_depth = x.clone().view(-1, channels, height, width)
             x_depth = self._normalize_input(x_depth, self.depth_mean, self.depth_std)
-            depth_estimations = self.depth_estimator(x_depth).unsqueeze(1)
-            depth_estimations = depth_estimations.view(batch_size, sequence_length, 1, height, width)
-            print("depth results", depth_estimations.shape)
-
-            # Forward depth
-            depth_estimations = depth_estimations.transpose(1, 2)
+            depth_estimations = self.depth_estimator(x_depth)
+            depth_estimations = depth_estimations.view(
+                batch_size, sequence_length, height, width
+            )
+            depth_estimations = depth_estimations.unsqueeze(2).transpose(1, 2)
             depth_saliency_maps_list = self.depth_encoder(depth_estimations)
             depth_decoded_maps = self.depth_decoder(depth_saliency_maps_list)
             depth_decoded_maps = self.depth_upsample(depth_decoded_maps)
 
         # Forward image
-        x = x.transpose(1, 2)
-        saliency_maps_list = self.encoder(x)
-        decoded_maps = self.decoder(saliency_maps_list)
-        decoded_maps = self.upsample(decoded_maps)
+        x_image = self._normalize_input(x, self.image_mean, self.image_std)
+        x_image = x_image.transpose(1, 2)
+        image_saliency_maps_list = self.image_encoder(x_image)
+        image_decoded_maps = self.image_decoder(image_saliency_maps_list)
+        image_decoded_maps = self.image_upsample(image_decoded_maps)
 
         # Final layer
         if self.with_depth_information:
-            decoded_maps = torch.cat([decoded_maps, depth_decoded_maps], dim=1)
+            decoded_maps = torch.cat([image_decoded_maps, depth_decoded_maps], dim=1)
+        else:
+            decoded_maps = image_decoded_maps
         output = self.final_layer(decoded_maps)
 
         if self.output_channels == 1:
