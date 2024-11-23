@@ -53,12 +53,11 @@ class TempSALTrainer(Trainer):
         with autocast(enabled=self.use_scaler):
             outputs = self.model(frame)
 
-        # Choose the ground truth based on the model's output channels
+        # Get loss
         if self.model.output_channels == 1:
             ground_truth = global_ground_truth
         else:
             ground_truth = ground_truths
         loss = self.criterion(outputs, ground_truth)
 
-        # Compute loss
         return loss, None, None # TODO: return None for now

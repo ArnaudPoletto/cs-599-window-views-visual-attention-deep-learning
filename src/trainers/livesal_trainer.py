@@ -61,11 +61,11 @@ class LiveSALTrainer(Trainer):
         with autocast(enabled=self.use_scaler):
             outputs = self.model(frame)
 
+        # Get loss
         if self.model.output_channels == 1:
             ground_truth = global_ground_truth
         else:
             ground_truth = ground_truths
         loss = self.criterion(outputs, ground_truth)
 
-        # Compute loss
         return loss, None, None # TODO: return None for now
