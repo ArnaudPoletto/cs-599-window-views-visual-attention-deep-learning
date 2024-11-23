@@ -152,10 +152,6 @@ class DHF1KDataset(Dataset):
         else:
             global_ground_truth = (global_ground_truth - min_val) / (max_val - min_val)
 
-        # TODO: REMOVE VIDEO TO IMAGE
-        frames = frames[0]
-
-
         return frames, ground_truths, global_ground_truth
     
 
