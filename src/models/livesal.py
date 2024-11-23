@@ -4,7 +4,7 @@ from torch import nn
 from typing import List, Tuple, Optional
 
 from src.models.image_encoder import ImageEncoder
-from src.models.depth_encoder import DepthEncoder
+from src.models.depth_estimator import DepthEstimator
 
 
 class ConvGRU(nn.Module):
@@ -360,7 +360,7 @@ class LiveSAL(nn.Module):
             freeze=freeze_encoder,
         )
         if with_depth_information:
-            self.depth_encoder = DepthEncoder(
+            self.depth_estimator = DepthEstimator(
                 freeze=freeze_encoder,
             )
 
@@ -506,6 +506,8 @@ class LiveSAL(nn.Module):
     def _normalize_input(
         self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor, is_image: bool
     ) -> torch.Tensor:
+        x = x.clone()
+        
         if x.max() > 1.0:
             x = x / 255.0
             
@@ -537,7 +539,7 @@ class LiveSAL(nn.Module):
 
         # Normalize and get depth features
         x_depth = self._normalize_input(x, self.depth_mean, self.depth_std, is_image)
-        depth_features = self.depth_encoder(x_depth).unsqueeze(1)
+        depth_features = self.depth_estimator(x_depth).unsqueeze(1)
 
         # Reshape to original size
         depth_features = nn.functional.interpolate(

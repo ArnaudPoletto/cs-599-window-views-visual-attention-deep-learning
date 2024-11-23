@@ -106,7 +106,7 @@ def get_criterion() -> nn.Module:
     criterion = CombinedLoss(
         {
             "kl": (kl_loss, 1.0),
-            "corr": (corr_loss, 0.5),
+            "corr": (corr_loss, 1.0),
         }
     )
 

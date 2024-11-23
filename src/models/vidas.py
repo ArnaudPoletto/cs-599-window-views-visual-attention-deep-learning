@@ -3,9 +3,7 @@ import torch
 import torch.nn as nn
 from typing import Tuple, List
 
-
-SALIENCY_OUT_CHANNELS = 64
-ATTENTION_OUT_CHANNELS = 16
+from src.models.depth_estimator import DepthEstimator
 
 
 class DSAM(nn.Module):
@@ -83,7 +81,7 @@ class ViDaSEncoder(nn.Module):
         input_shape: Tuple[int, int, int],
         hidden_channels_list: List[int],
         kernel_sizes: List[int],
-        use_max_pooling_list: List[bool],
+        use_max_poolings: List[bool],
         saliency_out_channels: int,
         attention_out_channels: int,
     ) -> None:
@@ -91,22 +89,22 @@ class ViDaSEncoder(nn.Module):
 
         if len(hidden_channels_list) != len(kernel_sizes) or len(
             hidden_channels_list
-        ) != len(use_max_pooling_list):
+        ) != len(use_max_poolings):
             raise ValueError(
-                f"❌ Length of hidden_channels_list, kernel_sizes and use_max_pooling must be equal, got {len(hidden_channels_list)}, {len(kernel_sizes)} and {len(use_max_pooling_list)}."
+                f"❌ Length of hidden_channels_list, kernel_sizes and use_max_poolings must be equal, got {len(hidden_channels_list)}, {len(kernel_sizes)} and {len(use_max_poolings)}."
             )
 
         self.input_channels = input_channels
         self.input_shape = input_shape
         self.hidden_channels_list = hidden_channels_list
         self.kernel_sizes = kernel_sizes
-        self.use_max_pooling_list = use_max_pooling_list
+        self.use_max_poolings = use_max_poolings
 
         in_channels_list = [input_channels] + hidden_channels_list[:-1]
         out_channels_list = hidden_channels_list
         self.encoder_blocks = nn.ModuleList()
         for in_channels, out_channels, kernel_size, use_max_pooling in zip(
-            in_channels_list, out_channels_list, kernel_sizes, use_max_pooling_list
+            in_channels_list, out_channels_list, kernel_sizes, use_max_poolings
         ):
             if use_max_pooling:
                 encoder_block = nn.Sequential(
@@ -247,22 +245,34 @@ class ViDaSDecoder(nn.Module):
 class ViDaS(nn.Module):
     def __init__(
         self,
-        input_channels: int = 3,
-        input_shape: Tuple[int, int, int] = (5, 331, 331),
-        hidden_channels_list: List[int] = [64, 128, 256, 512],
-        kernel_sizes: List[int] = [5, 3, 3, 3],
-        use_max_pooling_list: List[bool] = [False, True, False, False],
-        saliency_out_channels: int = SALIENCY_OUT_CHANNELS,
-        attention_out_channels: int = ATTENTION_OUT_CHANNELS,
+        input_channels: int,
+        output_channels: int,
+        input_shape: Tuple[int, int, int],
+        hidden_channels_list: List[int],
+        kernel_sizes: List[int],
+        use_max_poolings: List[bool],
+        saliency_out_channels: int,
+        attention_out_channels: int,
+        with_depth_information: bool
     ) -> None:
         super(ViDaS, self).__init__()
+
+        self.input_channels = input_channels
+        self.output_channels = output_channels
+        self.input_shape = input_shape
+        self.hidden_channels_list = hidden_channels_list
+        self.kernel_sizes = kernel_sizes
+        self.use_max_poolings = use_max_poolings
+        self.saliency_out_channels = saliency_out_channels
+        self.attention_out_channels = attention_out_channels
+        self.with_depth_information = with_depth_information
 
         self.encoder = ViDaSEncoder(
             input_channels=input_channels,
             input_shape=input_shape,
             hidden_channels_list=hidden_channels_list,
             kernel_sizes=kernel_sizes,
-            use_max_pooling_list=use_max_pooling_list,
+            use_max_poolings=use_max_poolings,
             saliency_out_channels=saliency_out_channels,
             attention_out_channels=attention_out_channels,
         )
@@ -271,21 +281,58 @@ class ViDaS(nn.Module):
             saliency_map_shapes=saliency_map_shapes,
             saliency_out_channels=saliency_out_channels,
         )
+        self.upsample = nn.Upsample(
+            size=input_shape[1:], mode="bilinear", align_corners=False
+        )
 
+        if with_depth_information:
+            self.depth_estimator = DepthEstimator(freeze=True)
+            self.depth_encoder = ViDaSEncoder(
+                input_channels=1,
+                input_shape=input_shape,
+                hidden_channels_list=hidden_channels_list,
+                kernel_sizes=kernel_sizes,
+                use_max_poolings=use_max_poolings,
+                saliency_out_channels=saliency_out_channels,
+                attention_out_channels=attention_out_channels,
+            )
+            saliency_map_shapes = self.depth_encoder.get_saliency_map_shapes()
+            self.depth_decoder = ViDaSDecoder(
+                saliency_map_shapes=saliency_map_shapes,
+                saliency_out_channels=saliency_out_channels,
+            )
+            self.depth_upsample = nn.Upsample(
+                size=input_shape[1:], mode="bilinear", align_corners=False
+            )
+
+            self.register_buffer(
+                "depth_mean",
+                torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1),
+                persistent=False,
+            )
+            self.register_buffer(
+                "depth_std",
+                torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1),
+                persistent=False,
+            )
+
+        final_layer_in_channels = saliency_out_channels
+        if with_depth_information:
+            final_layer_in_channels *= 2
         self.final_layer = nn.Sequential(
-            nn.Upsample(size=input_shape[1:], mode="bilinear", align_corners=False),
             nn.Conv2d(
-                in_channels=saliency_out_channels,
-                out_channels=saliency_out_channels,
+                in_channels=final_layer_in_channels,
+                out_channels=saliency_out_channels // 2,
                 kernel_size=3,
                 padding=1,
+                groups=saliency_out_channels // 2,
                 bias=False,
             ),
-            nn.BatchNorm2d(num_features=saliency_out_channels),
+            nn.BatchNorm2d(num_features=saliency_out_channels // 2),
             nn.ReLU(),
             nn.Conv2d(
-                in_channels=saliency_out_channels,
-                out_channels=1,
+                in_channels=saliency_out_channels // 2,
+                out_channels=output_channels,
                 kernel_size=1,
                 padding=0,
                 bias=True,
@@ -293,12 +340,44 @@ class ViDaS(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Reshape to match 3D input: channels come before sequence length
-        x = x.transpose(1, 2)
+    def _normalize_input(
+        self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
+    ) -> torch.Tensor:
+        if x.max() > 1.0:
+            x = x / 255.0
+            
+        normalized_x = (x - mean) / std
 
+        return normalized_x
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.with_depth_information:
+            # Estimate depths
+            batch_size, sequence_length, channels, height, width = x.shape
+            x_depth = x.clone().view(-1, channels, height, width)
+            x_depth = self._normalize_input(x_depth, self.depth_mean, self.depth_std)
+            depth_estimations = self.depth_estimator(x_depth).unsqueeze(1)
+            depth_estimations = depth_estimations.view(batch_size, sequence_length, 1, height, width)
+            print("depth results", depth_estimations.shape)
+
+            # Forward depth
+            depth_estimations = depth_estimations.transpose(1, 2)
+            depth_saliency_maps_list = self.depth_encoder(depth_estimations)
+            depth_decoded_maps = self.depth_decoder(depth_saliency_maps_list)
+            depth_decoded_maps = self.depth_upsample(depth_decoded_maps)
+
+        # Forward image
+        x = x.transpose(1, 2)
         saliency_maps_list = self.encoder(x)
         decoded_maps = self.decoder(saliency_maps_list)
+        decoded_maps = self.upsample(decoded_maps)
+
+        # Final layer
+        if self.with_depth_information:
+            decoded_maps = torch.cat([decoded_maps, depth_decoded_maps], dim=1)
         output = self.final_layer(decoded_maps)
 
-        return output.squeeze(1)
+        if self.output_channels == 1:
+            output = output.squeeze(1)
+
+        return output

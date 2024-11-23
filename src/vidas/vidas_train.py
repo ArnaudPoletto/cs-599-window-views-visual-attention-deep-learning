@@ -25,8 +25,28 @@ from src.config import (
     PROCESSED_DHF1K_PATH,
 )
 
-def get_model() -> ViDaS:
-    return ViDaS().to(DEVICE)
+def get_model(
+    input_channels: int,
+    output_channels: int,
+    input_shape: tuple,
+    hidden_channels_list: list,
+    kernel_sizes: list,
+    use_max_poolings: list,
+    saliency_out_channels: int,
+    attention_out_channels: int,
+    with_depth_information: bool,
+) -> ViDaS:
+    return ViDaS(
+        input_channels=input_channels,
+        output_channels=output_channels,
+        input_shape=input_shape,
+        hidden_channels_list=hidden_channels_list,
+        kernel_sizes=kernel_sizes,
+        use_max_poolings=use_max_poolings,
+        saliency_out_channels=saliency_out_channels,
+        attention_out_channels=attention_out_channels,
+        with_depth_information=with_depth_information,
+    ).to(DEVICE)
 
 def get_criterion() -> nn.Module:
     kl_loss = KLDivLoss(temperature=1.0, eps=1e-7)
@@ -34,7 +54,7 @@ def get_criterion() -> nn.Module:
     criterion = CombinedLoss(
         {
             "kl": (kl_loss, 1.0),
-            "corr": (corr_loss, 0.5),
+            "corr": (corr_loss, 1.0),
         }
     )
 
@@ -107,6 +127,15 @@ def main() -> None:
     save_model = bool(config["save_model"])
     use_scaler = bool(config["use_scaler"])
     with_transforms = bool(config["with_transforms"])
+    input_channels = int(config["input_channels"])
+    output_channels = int(config["output_channels"])
+    input_shape = tuple(map(int, config["input_shape"]))
+    hidden_channels_list = list(map(int, config["hidden_channels_list"]))
+    kernel_sizes = list(map(int, config["kernel_sizes"]))
+    use_max_poolings = list(map(bool, config["use_max_poolings"]))
+    saliency_out_channels = int(config["saliency_out_channels"])
+    attention_out_channels = int(config["attention_out_channels"])
+    with_depth_information = bool(config["with_depth_information"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataloaders, model, criterion, optimizer, and trainer
@@ -126,7 +155,17 @@ def main() -> None:
         seed=SEED,
     )
     
-    model = get_model()
+    model = get_model(
+        input_channels=input_channels,
+        output_channels=output_channels,
+        input_shape=input_shape,
+        hidden_channels_list=hidden_channels_list,
+        kernel_sizes=kernel_sizes,
+        use_max_poolings=use_max_poolings,
+        saliency_out_channels=saliency_out_channels,
+        attention_out_channels=attention_out_channels,
+        with_depth_information=with_depth_information,
+    )
     criterion = get_criterion()
     optimizer = get_optimizer(
         model,

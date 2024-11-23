@@ -30,6 +30,15 @@ class ViDaSTrainer(Trainer):
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
             "model_name": self.model.__class__.__name__,
+            "input_channels": self.model.input_channels,
+            "output_channels": self.model.output_channels,
+            "input_shape": self.model.input_shape,
+            "hidden_channels_list": self.model.hidden_channels_list,
+            "kernel_sizes": self.model.kernel_sizes,
+            "use_max_poolings": self.model.use_max_poolings,
+            "saliency_out_channels": self.model.saliency_out_channels,
+            "attention_out_channels": self.model.attention_out_channels,
+            "with_depth_information": self.model.with_depth_information,
         }
 
     def _get_name(
@@ -50,6 +59,10 @@ class ViDaSTrainer(Trainer):
             outputs = self.model(frame)
 
         # Get loss
-        loss = self.criterion(outputs, global_ground_truth)
+        if self.model.output_channels == 1:
+            ground_truth = global_ground_truth
+        else:
+            ground_truth = ground_truths
+        loss = self.criterion(outputs, ground_truth)
 
         return loss, None, None # TODO: return None for now
