@@ -118,19 +118,19 @@
 
 import torch
 import torch.nn as nn
-from typing import Tuple
+from typing import Tuple, List
 import torch.nn.functional as F
 
 
-DSAM_SALIENCY_OUT_CHANNELS = 64
-DSAM_ATTENTION_OUT_CHANNELS = 16
+SALIENCY_OUT_CHANNELS = 64
+ATTENTION_OUT_CHANNELS = 16
 
 class DSAM(nn.Module):
     def __init__(
             self, 
             in_channels: int,
-            saliency_out_channels: int = DSAM_SALIENCY_OUT_CHANNELS,
-            attention_out_channels: int = DSAM_ATTENTION_OUT_CHANNELS,
+            saliency_out_channels: int,
+            attention_out_channels: int,
             ) -> None:
         super(DSAM, self).__init__()
 
@@ -180,67 +180,74 @@ class DSAM(nn.Module):
         saliency_maps = self.saliency_conv(x_pool)
 
         # Generate attention maps
-        attention_map = self.attention_layer(x_pool)
-        attention_map = torch.softmax(attention_map, dim=(2, 3))
-        attention_map = self.upsample(attention_map)
+        attention = self.attention_layer(x_pool)
+        attention_map = torch.softmax(attention, dim=(2, 3))
+        activation_map = self.upsample(attention) # TODO: not upsampled as needed yet
 
 
         # Enhance features
         enhanced = (1 + attention_map) * x
 
-        return enhanced, saliency_maps, attention_map
+        return enhanced, saliency_maps, activation_map
     
 class ViDaSEncoder(nn.Module):
-    pass
+    def __init__(
+        self,
+        input_channels: int,
+        input_shape: Tuple[int, int, int],
+        hidden_channels_list: List[int],
+        kernel_sizes: List[int],
+        use_max_pooling_list: List[bool],
+        saliency_out_channels: int,
+        attention_out_channels: int,
+    ) -> None:
+        super(ViDaSEncoder, self).__init__()
 
-class ViDaSDecoder(nn.Module):
-    def __init__(self) -> None:
-        super(ViDaSDecoder, self).__init__()
-        pass
-    
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        pass
+        if len(hidden_channels_list) != len(kernel_sizes) or len(hidden_channels_list) != len(use_max_pooling):
+            raise ValueError(f"❌ Length of hidden_channels_list, kernel_sizes and use_max_pooling must be equal, got {len(hidden_channels_list)}, {len(kernel_sizes)} and {len(use_max_pooling)}.") 
 
-class ViDaS(nn.Module):
-    def __init__(self):
-        super(ViDaS, self).__init__()
+        self.input_channels = input_channels
+        self.input_shape = input_shape
+        self.hidden_channels_list = hidden_channels_list
+        self.kernel_sizes = kernel_sizes
+        self.use_max_pooling_list = use_max_pooling_list
 
-        # TODO: remove hardcoding
-        self.encoder_blocks = nn.ModuleList([
-            self._make_encoder_block(
-                in_channels=3, 
-                out_channels=64, 
-                kernel_size=7,
-                stride=(1, 2, 2),
-                padding=3,
-            ),
-            nn.Sequential([
-                nn.MaxPool3d(kernel_size=(1, 2, 2)),
-                self._make_encoder_block(
-                    in_channels=64, 
-                    out_channels=128, 
-                    kernel_size=3,
-                    stride=1,
-                    padding=1,
-                ),
-            ]),
-            self._make_encoder_block(
-                in_channels=128, 
-                out_channels=256,
-                kernel_size=3,
-                stride=(1, 2, 2),
-                padding=1,
-            ),
-            self._make_encoder_block(
-                in_channels=256, 
-                out_channels=512,
-                kernel_size=3,
-                stride=(1, 2, 2),
-                padding=1,
-            ),
+        in_channels_list = [input_channels] + hidden_channels_list[:-1]
+        out_channels_list = hidden_channels_list
+        self.encoder_blocks = nn.ModuleList()
+        for in_channels, out_channels, kernel_size, use_max_pooling in zip(in_channels_list, out_channels_list, kernel_sizes, use_max_pooling_list):
+            if use_max_pooling:
+                encoder_block = nn.Sequential(
+                    nn.MaxPool3d(kernel_size=(1, 2, 2)),
+                    self._make_encoder_block(
+                        in_channels=in_channels,
+                        out_channels=out_channels,
+                        kernel_size=kernel_size,
+                        stride=1,
+                        padding=self._get_padding(kernel_size),
+                    ),
+                )
+            else:
+                encoder_block = self._make_encoder_block(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel_size,
+                    stride=(1, 2, 2),
+                    padding=self._get_padding(kernel_size),
+                )
+            self.encoder_blocks.append(encoder_block)
+        
+        self.dsams = nn.ModuleList([
+            DSAM(
+                in_channels=hidden_channels,
+                saliency_out_channels=saliency_out_channels,
+                attention_out_channels=attention_out_channels,
+            )
+            for hidden_channels in hidden_channels_list
         ])
 
-        self.dsams = nn.ModuleList([DSAM(c) for c in [64, 128, 256, 512]])
+    def _get_padding(self, kernel_size: int) -> int:
+        return kernel_size // 2
 
     def _make_encoder_block(
             self, 
@@ -272,13 +279,101 @@ class ViDaS(nn.Module):
         )
 
         return encoder_block
+    
+    def get_saliency_map_shapes(self) -> List[Tuple[int, int]]:
+        saliency_map_shapes = [
+            (self.input_shape[1] // 2**(i+1), self.input_shape[2] // 2**(i+1))
+            for i in range(len(self.hidden_channels_list))
+        ]
+
+        return saliency_map_shapes
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Encode and retain saliency maps
+        if x.shape[1] != self.input_channels:
+            raise ValueError(f"❌ Input tensor has {x.shape[1]} channels, expected {self.input_channels}.")
+        if x.shape[2:] != self.input_shape:
+            raise ValueError(f"❌ Input tensor has shape {x.shape[2:]}, expected {self.input_shape}.")
+        
         saliency_maps_list = []
         for encoding_block, dsam in zip(self.encoder_blocks, self.dsams):
             x = encoding_block(x)
-            x, saliency_maps = dsam(x)
+            x, saliency_maps, _ = dsam(x)
             saliency_maps_list.append(saliency_maps)
 
-        # Decode
+        return saliency_maps_list
+            
+
+class ViDaSDecoder(nn.Module):
+    def __init__(
+        self,
+        saliency_map_shapes: List[Tuple[int, int]],
+        saliency_out_channels: int,
+    ) -> None:
+        super(ViDaSDecoder, self).__init__()
+        
+        self.upsamples = nn.ModuleList()
+        self.convs = nn.ModuleList()
+        for saliency_map_shape in saliency_map_shapes:
+            upsample = nn.Upsample(size=saliency_map_shape, mode="bilinear", align_corners=False)
+            self.upsamples.append(upsample)
+
+            conv = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=saliency_out_channels * 2,
+                    out_channels=saliency_out_channels,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False,
+                ),
+                nn.BatchNorm2d(num_features=saliency_out_channels),
+            )
+            self.convs.append(conv)
+
+    def forward(self, saliency_maps_list: List[torch.Tensor]) -> torch.Tensor:
+        x = saliency_maps_list[-1]
+        y = saliency_maps_list[-2]
+
+        for i, (upsample, conv) in enumerate(zip(self.upsamples, self.convs)):
+            x = upsample(x)
+            x = torch.cat([x, y], dim=1)
+            x = conv(x)
+            y = saliency_maps_list[-(i+3)]
+
+        return x
+
+
+        
+
+class ViDaS(nn.Module):
+    def __init__(
+        self,
+        input_channels: int = 3,
+        input_shape: Tuple[int, int, int] = (5, 331, 331),
+        hidden_channels_list: List[int] = [64, 128, 256, 512],
+        kernel_sizes: List[int] = [7, 3, 3, 3],
+        use_max_pooling_list: List[bool] = [False, True, False, False],
+        saliency_out_channels: int = SALIENCY_OUT_CHANNELS,
+        attention_out_channels: int = ATTENTION_OUT_CHANNELS,
+    ) -> None:
+        super(ViDaS, self).__init__()
+
+        self.encoder = ViDaSEncoder(
+            input_channels=input_channels,
+            input_shape=input_shape,
+            hidden_channels_list=hidden_channels_list,
+            kernel_sizes=kernel_sizes,
+            use_max_pooling_list=use_max_pooling_list,
+            saliency_out_channels=saliency_out_channels,
+            attention_out_channels=attention_out_channels,
+        )
+        saliency_map_shapes = self.encoder.get_saliency_map_shapes()
+        self.decoder = ViDaSDecoder(
+            saliency_map_shapes=saliency_map_shapes,
+            saliency_out_channels=saliency_out_channels,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        saliency_maps_list = self.encoder(x)
+        output = self.decoder(saliency_maps_list)
+
+        return output
