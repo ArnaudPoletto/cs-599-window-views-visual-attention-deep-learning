@@ -31,7 +31,6 @@ class LiveSALTrainer(Trainer):
         return {
             "model_name": self.model.__class__.__name__,
             "hidden_channels": self.model.hidden_channels,
-            "output_channels": self.model.output_channels,
             "temporal_output": self.model.temporal_output,
             "with_absolute_positional_embeddings": self.model.with_absolute_positional_embeddings,
             "with_relative_positional_embeddings": self.model.with_relative_positional_embeddings,
@@ -63,10 +62,10 @@ class LiveSALTrainer(Trainer):
             outputs = self.model(frame)
 
         # Get loss
-        if self.model.output_channels == 1:
-            ground_truth = global_ground_truth
-        else:
+        if self.model.temporal_output:
             ground_truth = ground_truths
+        else:
+            ground_truth = global_ground_truth
         loss = self.criterion(outputs, ground_truth)
 
         return loss, None, None # TODO: return None for now

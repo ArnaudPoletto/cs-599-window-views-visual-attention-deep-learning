@@ -338,7 +338,6 @@ class LiveSAL(nn.Module):
         super(LiveSAL, self).__init__()
 
         self.hidden_channels = hidden_channels
-        self.output_channels = SEQUENCE_LENGTH if temporal_output else 1
         self.temporal_output = temporal_output
         self.with_absolute_positional_embeddings = with_absolute_positional_embeddings
         self.with_relative_positional_embeddings = with_relative_positional_embeddings
@@ -457,7 +456,7 @@ class LiveSAL(nn.Module):
         if with_absolute_positional_embeddings:
             self.absolute_positional_embeddings = nn.Parameter(
                 torch.randn(
-                    self.output_channels, hidden_channels, self.fusion_size, self.fusion_size
+                    SEQUENCE_LENGTH, hidden_channels, self.fusion_size, self.fusion_size
                 )
             )
 
@@ -500,14 +499,17 @@ class LiveSAL(nn.Module):
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
                 )
-                for _ in range(fusion_level - 1)
+                for _ in range(fusion_level)
             ]
         )
 
         # Final layer
+        final_layer_in_channels = hidden_channels
+        if not temporal_output:
+            final_layer_in_channels *= SEQUENCE_LENGTH
         self.final_layer = nn.Sequential(
             nn.Conv2d(
-                in_channels=hidden_channels,
+                in_channels=final_layer_in_channels,
                 out_channels=hidden_channels // 2,
                 kernel_size=3,
                 padding=1,
@@ -601,12 +603,14 @@ class LiveSAL(nn.Module):
             for skip_features in skip_features_list:
                 batch_size, channels, height, width = skip_features.shape
                 skip_features = skip_features.unsqueeze(1).repeat(
-                    1, self.output_channels, 1, 1, 1
+                    1, SEQUENCE_LENGTH, 1, 1, 1
                 ).view(
-                    batch_size * self.output_channels, channels, height, width
+                    batch_size * SEQUENCE_LENGTH, channels, height, width
                 )
                 resized_skip_features_list.append(skip_features)
             skip_features_list = resized_skip_features_list
+
+        print("SKIP_FEATURES", [skip_features.shape for skip_features in skip_features_list])
 
         return image_projected_features_list, skip_features_list
 
@@ -647,9 +651,9 @@ class LiveSAL(nn.Module):
         if is_image:
             batch_size, channels, height, width = fused_features.shape
             fused_features = fused_features.unsqueeze(1).repeat(
-                1, self.output_channels, 1, 1, 1
+                1, SEQUENCE_LENGTH, 1, 1, 1
             ).view(
-                batch_size * self.output_channels, channels, height, width
+                batch_size * SEQUENCE_LENGTH, channels, height, width
             )
 
         return fused_features
@@ -659,7 +663,7 @@ class LiveSAL(nn.Module):
     ) -> torch.Tensor:
         batch_size_sequence_length, channels, height, width = fused_features.shape
         fused_features_list = fused_features.view(
-            -1, self.output_channels, channels, height, width
+            -1, SEQUENCE_LENGTH, channels, height, width
         )
         fused_features = (
             fused_features_list + self.absolute_positional_embeddings.unsqueeze(0)
@@ -670,7 +674,7 @@ class LiveSAL(nn.Module):
     def _get_graph_features(self, fused_features: torch.Tensor) -> torch.Tensor:
         batch_size_sequence_length, channels, height, width = fused_features.shape
         fused_features_list = fused_features.view(
-            -1, self.output_channels, channels, height, width
+            -1, SEQUENCE_LENGTH, channels, height, width
         ).transpose(0, 1).contiguous()
 
         graph_features_list = self.graph_processor(fused_features_list)
@@ -691,26 +695,20 @@ class LiveSAL(nn.Module):
         # Organize features as independent samples
         batch_size_sequence_length, channels, height, width = fused_features.shape
         fused_features_list = (
-            fused_features.view(-1, self.output_channels, channels, height, width)
+            fused_features.view(-1, SEQUENCE_LENGTH, channels, height, width)
             .transpose(0, 1)
             .contiguous()
         )
-        resized_skip_features_list = []
+        reshaped_skip_features_list = []
         for skip_features in skip_features_list:
             batch_size_sequence_length, channels, height, width = skip_features.shape
-            skip_features = (
-                skip_features.view(-1, self.output_channels, channels, height, width)
+            reshaped_skip_features = (
+                skip_features.view(-1, SEQUENCE_LENGTH, channels, height, width)
                 .transpose(0, 1)
                 .contiguous()
             )
-            resized_skip_features_list.append(skip_features)
-        skip_features_list = [
-            [
-                resized_skip_features_list[j][i]
-                for j in range(len(resized_skip_features_list))
-            ]
-            for i in range(self.output_channels)
-        ]
+            reshaped_skip_features_list.append(reshaped_skip_features)
+        skip_features_list = list(zip(*reshaped_skip_features_list))
 
         # Decode sample features sequentially
         decoded_features_list = []
@@ -719,6 +717,7 @@ class LiveSAL(nn.Module):
         ):
             for i, decoder_block in enumerate(self.decoder):
                 skip_feat = skip_features[-(i + 1)]
+                print("SKIP", skip_feat.shape)
                 if fused_features.shape[-2:] != skip_feat.shape[-2:]:
                     fused_features = nn.functional.interpolate(
                         fused_features,
@@ -726,8 +725,10 @@ class LiveSAL(nn.Module):
                         mode="bilinear",
                         align_corners=False,
                     )
+                print("FUSED", fused_features.shape)
                 fused_features = torch.cat([fused_features, skip_feat], dim=1)
                 fused_features = decoder_block(fused_features)
+                print("AFTER_DECODER_BLOCK", fused_features.shape)
             decoded_features_list.append(fused_features)
         decoded_features_list = torch.stack(decoded_features_list, dim=0)
 
@@ -736,19 +737,33 @@ class LiveSAL(nn.Module):
     def _get_outputs(
         self, decoded_features_list: torch.Tensor, output_shape: Tuple[int, int]
     ) -> torch.Tensor:
-        # Upsample to original size and pass through final layer
-        outputs = []
-        for decoded_features in decoded_features_list:
-            decoded_features = nn.functional.interpolate(
-                decoded_features,
+        if self.temporal_output:
+            # Upsample to original size and pass through final layer
+            outputs = []
+            for decoded_features in decoded_features_list:
+                decoded_features = nn.functional.interpolate(
+                    decoded_features,
+                    size=output_shape,
+                    mode="bilinear",
+                    align_corners=False,
+                )
+                output = self.final_layer(decoded_features)
+                outputs.append(output)
+            outputs = torch.stack(outputs, dim=0)
+            outputs = outputs.squeeze(2).transpose(0, 1).contiguous()
+        else:
+            sequence_length, batch_size, channels, height, width = decoded_features_list.shape
+            decoded_features_list = decoded_features_list.transpose(0, 1).contiguous()
+            decoded_features_list = decoded_features_list.view(
+                batch_size, sequence_length * channels, height, width
+            )
+            decoded_features_list = nn.functional.interpolate(
+                decoded_features_list,
                 size=output_shape,
                 mode="bilinear",
                 align_corners=False,
             )
-            output = self.final_layer(decoded_features)
-            outputs.append(output)
-        outputs = torch.stack(outputs, dim=0).squeeze(2).transpose(0, 1).contiguous()
-        if outputs.shape[1] == 1:
+            outputs = self.final_layer(decoded_features_list)
             outputs = outputs.squeeze(1)
 
         return outputs
