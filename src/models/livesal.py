@@ -64,6 +64,7 @@ class GraphProcessor(nn.Module):
         n_heads: int,
         neighbor_radius: int,
         n_iterations: int,
+        dropout_rate: float,
     ):
         super(GraphProcessor, self).__init__()
 
@@ -79,6 +80,9 @@ class GraphProcessor(nn.Module):
         self.n_iterations = n_iterations
         self.scale = hidden_channels**-0.5
         self.head_dim = hidden_channels // n_heads
+
+        self.spatial_dropout = nn.Dropout2d(dropout_rate)
+        self.temporal_dropout = nn.Dropout3d(dropout_rate)
 
         self.intra_norm = nn.LayerNorm([hidden_channels, fusion_size, fusion_size])
         self.intra_key_conv = nn.Conv2d(
@@ -278,24 +282,34 @@ class GraphProcessor(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sequence_length, batch_size, channels, height, width = x.shape
         h = x
+
+        if self.training:
+            h = h.transpose(1, 2).contiguous()
+            h = self.temporal_dropout(h)
+            h = h.transpose(1, 2).contiguous()
+
         for _ in range(self.n_iterations):
             new_h = []
             for i in range(sequence_length):
-                intra_output = self._compute_intra_attention(h[i])
+                hi = h[i]
+                if self.training:
+                    hi = self.spatial_dropout(hi)
+
+                intra_output = self._compute_intra_attention(hi)
 
                 neighbors = [
                     (j, h[j])
                     for j in range(sequence_length)
                     if i != j and abs(i - j) <= self.neighbor_radius
                 ]
-                inter_output = self._compute_inter_attention(i, h[i], neighbors)
+                inter_output = self._compute_inter_attention(i, hi, neighbors)
                 combined_message = (
                     self.intra_inter_alpha * intra_output
                     + (1 - self.intra_inter_alpha) * inter_output
                 )
 
-                next_h = self.gru(combined_message, h[i])
-                next_h = next_h + h[i]
+                next_h = self.gru(combined_message, hi)
+                next_h = next_h + hi
                 next_h = self.norm(next_h)
                 new_h.append(next_h)
 
@@ -317,6 +331,7 @@ class LiveSAL(nn.Module):
         with_graph_processing: bool,
         freeze_encoder: bool,
         with_depth_information: bool,
+        dropout_rate: float = 0.25, # TODO: remove hardcodd here, add in config
         fusion_level: Optional[int] = None,
     ):
         super(LiveSAL, self).__init__()
@@ -331,6 +346,7 @@ class LiveSAL(nn.Module):
         self.with_graph_processing = with_graph_processing
         self.freeze_encoder = freeze_encoder
         self.with_depth_information = with_depth_information
+        self.dropout_rate = dropout_rate
 
         # Get normalizations
         self.register_buffer(
@@ -392,6 +408,7 @@ class LiveSAL(nn.Module):
                     ),
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
+                     nn.Dropout2d(dropout_rate),
                     nn.Conv2d(
                         in_channels=hidden_channels,
                         out_channels=hidden_channels,
@@ -402,6 +419,7 @@ class LiveSAL(nn.Module):
                     ),
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
+                     nn.Dropout2d(dropout_rate),
                     nn.Conv2d(
                         in_channels=hidden_channels,
                         out_channels=hidden_channels,
@@ -431,6 +449,7 @@ class LiveSAL(nn.Module):
             ),
             nn.BatchNorm2d(hidden_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(dropout_rate),
         )
 
         if with_absolute_positional_embeddings:
@@ -448,6 +467,7 @@ class LiveSAL(nn.Module):
                 neighbor_radius=neighbor_radius,
                 fusion_size=self.fusion_size,
                 n_iterations=n_iterations,
+                dropout_rate=self.dropout_rate,
             )
 
         # Decoder layers
@@ -466,6 +486,7 @@ class LiveSAL(nn.Module):
                     ),
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
+                    nn.Dropout2d(dropout_rate),
                     nn.Conv2d(
                         in_channels=hidden_channels,
                         out_channels=hidden_channels,
@@ -475,6 +496,7 @@ class LiveSAL(nn.Module):
                     ),
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
+                    nn.Dropout2d(dropout_rate),
                 )
                 for _ in range(fusion_level - 1)
             ]

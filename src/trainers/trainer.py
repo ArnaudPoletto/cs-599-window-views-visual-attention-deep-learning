@@ -98,12 +98,13 @@ class Trainer(ABC):
                 stats = self._evaluate(val_loader)
                 self.eval_val_loss = stats["loss"]
                 if (
-                    self.eval_val_loss < self.best_eval_val_loss
-                    and save_path is not None
+                    (self.eval_val_loss < self.best_eval_val_loss
+                    and save_path is not None) or True
                 ):
                     print(
                         f"🎉 Saving model with new best loss: {self.eval_val_loss:.4f}"
                     )
+                    print("!!!!! TODO: for now, always save the model")
                     torch.save(self.model.state_dict(), save_path)
                     self.best_eval_val_loss = self.eval_val_loss
 
