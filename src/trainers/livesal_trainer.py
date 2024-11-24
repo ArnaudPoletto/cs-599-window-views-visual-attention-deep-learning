@@ -40,6 +40,7 @@ class LiveSALTrainer(Trainer):
             "with_graph_processing": self.model.with_graph_processing,
             "freeze_encoder": self.model.freeze_encoder,
             "with_depth_information": self.model.with_depth_information,
+            "dropout_rate": self.model.dropout_rate,
             "fusion_level": self.model.fusion_level,
 
         }

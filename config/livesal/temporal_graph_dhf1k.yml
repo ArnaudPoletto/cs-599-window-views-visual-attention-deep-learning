@@ -20,4 +20,5 @@ n_iterations: 5
 with_graph_processing: True
 freeze_encoder: True
 with_depth_information: True
+dropout_rate: 0.0
 fusion_level: 4
