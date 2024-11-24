@@ -29,7 +29,7 @@ from src.config import (
 
 
 def get_model(
-    temporal_output: int,
+    temporal_output: bool,
     freeze_encoder: bool,
 ) -> nn.Module:
     return TempSAL(temporal_output=temporal_output, freeze_encoder=freeze_encoder).to(
@@ -143,7 +143,7 @@ def main() -> None:
     save_model = bool(config["save_model"])
     use_scaler = bool(config["use_scaler"])
     with_transforms = bool(config["with_transforms"])
-    temporal_output = int(config["temporal_output"])
+    temporal_output = bool(config["temporal_output"])
     freeze_encoder = bool(config["freeze_encoder"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 

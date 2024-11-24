@@ -75,7 +75,7 @@ def _get_dataloaders(
 
 def get_model(
     hidden_channels: int,
-    output_channels: int,
+    temporal_output: bool,
     with_absolute_positional_embeddings: bool,
     with_relative_positional_embeddings: bool,
     n_heads: int,
@@ -88,7 +88,7 @@ def get_model(
 ) -> nn.Module:
     return LiveSAL(
         hidden_channels=hidden_channels,
-        output_channels=output_channels,
+        temporal_output=temporal_output,
         with_absolute_positional_embeddings=with_absolute_positional_embeddings,
         with_relative_positional_embeddings=with_relative_positional_embeddings,
         n_heads=n_heads,
@@ -188,7 +188,7 @@ def main() -> None:
     use_scaler = bool(config["use_scaler"])
     with_transforms = bool(config["with_transforms"])
     hidden_channels = int(config["hidden_channels"])
-    output_channels = int(config["output_channels"])
+    temporal_output = bool(config["temporal_output"])
     with_absolute_positional_embeddings = bool(config["with_absolute_positional_embeddings"])
     with_relative_positional_embeddings = bool(config["with_relative_positional_embeddings"])
     n_heads = int(config["n_heads"])
@@ -209,7 +209,7 @@ def main() -> None:
     )
     model = get_model(
         hidden_channels=hidden_channels,
-        output_channels=output_channels,
+        temporal_output=temporal_output,
         with_absolute_positional_embeddings=with_absolute_positional_embeddings,
         with_relative_positional_embeddings=with_relative_positional_embeddings,
         n_heads=n_heads,

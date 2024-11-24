@@ -5,6 +5,7 @@ from typing import List, Tuple, Optional
 
 from src.models.image_encoder import ImageEncoder
 from src.models.depth_estimator import DepthEstimator
+from src.config import SEQUENCE_LENGTH
 
 
 class ConvGRU(nn.Module):
@@ -322,7 +323,7 @@ class LiveSAL(nn.Module):
     def __init__(
         self,
         hidden_channels: int,
-        output_channels: int,
+        temporal_output: bool,
         with_absolute_positional_embeddings: bool,
         with_relative_positional_embeddings: bool,
         n_heads: int,
@@ -337,7 +338,8 @@ class LiveSAL(nn.Module):
         super(LiveSAL, self).__init__()
 
         self.hidden_channels = hidden_channels
-        self.output_channels = output_channels
+        self.output_channels = SEQUENCE_LENGTH if temporal_output else 1
+        self.temporal_output = temporal_output
         self.with_absolute_positional_embeddings = with_absolute_positional_embeddings
         self.with_relative_positional_embeddings = with_relative_positional_embeddings
         self.n_heads = n_heads
@@ -455,7 +457,7 @@ class LiveSAL(nn.Module):
         if with_absolute_positional_embeddings:
             self.absolute_positional_embeddings = nn.Parameter(
                 torch.randn(
-                    output_channels, hidden_channels, self.fusion_size, self.fusion_size
+                    self.output_channels, hidden_channels, self.fusion_size, self.fusion_size
                 )
             )
 

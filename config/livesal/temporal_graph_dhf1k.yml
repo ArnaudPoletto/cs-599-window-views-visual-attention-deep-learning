@@ -11,7 +11,7 @@ use_scaler: True
 with_transforms: True
 
 hidden_channels: 64
-output_channels: 5
+temporal_output: True
 with_absolute_positional_embeddings: True
 with_relative_positional_embeddings: True
 n_heads: 1

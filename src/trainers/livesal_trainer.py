@@ -32,6 +32,7 @@ class LiveSALTrainer(Trainer):
             "model_name": self.model.__class__.__name__,
             "hidden_channels": self.model.hidden_channels,
             "output_channels": self.model.output_channels,
+            "temporal_output": self.model.temporal_output,
             "with_absolute_positional_embeddings": self.model.with_absolute_positional_embeddings,
             "with_relative_positional_embeddings": self.model.with_relative_positional_embeddings,
             "n_heads": self.model.n_heads,
