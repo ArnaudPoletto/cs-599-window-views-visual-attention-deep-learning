@@ -504,7 +504,7 @@ class LiveSAL(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def _normalize_input(
-        self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor, is_image: bool
+        self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
     ) -> torch.Tensor:
         x = x.clone()
         
@@ -524,7 +524,7 @@ class LiveSAL(nn.Module):
             x = x.view(-1, channels, height, width)
 
         # Normalize and get image features
-        x_image = self._normalize_input(x, self.image_mean, self.image_std, is_image)
+        x_image = self._normalize_input(x, self.image_mean, self.image_std)
         image_features_list = self.image_encoder(x_image)
 
         return image_features_list
@@ -538,51 +538,37 @@ class LiveSAL(nn.Module):
             x = x.view(-1, channels, height, width)
 
         # Normalize and get depth features
-        x_depth = self._normalize_input(x, self.depth_mean, self.depth_std, is_image)
-        depth_features = self.depth_estimator(x_depth).unsqueeze(1)
-
-        # Reshape to original size
-        depth_features = nn.functional.interpolate(
-            depth_features,
-            size=(x.shape[-2], x.shape[-1]),
-            mode="bilinear",
-            align_corners=False,
-        )
+        x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
+        depth_features = self.depth_estimator(x_depth)
 
         return depth_features
 
-    def _get_projected_image_features_list(
+    def _get_image_projected_features_list(
         self,
         image_features_list: List[torch.Tensor],
         depth_features: Optional[torch.Tensor],
         is_image: bool,
     ) -> List[torch.Tensor]:
-        # Get features list
-        features_list = image_features_list
-
-        # Get projections
-        projections = self.image_projections
-
-        projected_image_features_list = []
-        for features, projection_layer in zip(features_list, projections):
-            projected_features = projection_layer(features)
-            projected_image_features_list.append(projected_features)
+        image_projected_features_list = []
+        for image_features, image_projection in zip(image_features_list, self.image_projections):
+            image_projected_features = image_projection(image_features)
+            image_projected_features_list.append(image_projected_features)
 
         # Get skip features
-        skip_features_list = projected_image_features_list[: self.fusion_level]
+        skip_features_list = image_projected_features_list[: self.fusion_level]
         
         # Add depth information if needed
         if self.with_depth_information:
             new_skip_features_list = []
             for skip_features in skip_features_list:
                 if depth_features.shape[-2:] != skip_features.shape[-2:]:
-                    depth_features = nn.functional.interpolate(
+                    depth_resized_features = nn.functional.interpolate(
                         depth_features,
                         size=skip_features.shape[-2:],
                         mode="bilinear",
                         align_corners=False,
                     )
-                new_skip_features_list.append(torch.cat([skip_features, depth_features], dim=1))
+                new_skip_features_list.append(torch.cat([skip_features, depth_resized_features], dim=1))
             skip_features_list = new_skip_features_list
 
         # Repeat image skip features for graph processing
@@ -592,33 +578,32 @@ class LiveSAL(nn.Module):
                 batch_size, channels, height, width = skip_features.shape
                 skip_features = skip_features.unsqueeze(1).repeat(
                     1, self.output_channels, 1, 1, 1
-                )
-                skip_features = skip_features.view(
+                ).view(
                     batch_size * self.output_channels, channels, height, width
                 )
                 resized_skip_features_list.append(skip_features)
             skip_features_list = resized_skip_features_list
 
-        return projected_image_features_list, skip_features_list
+        return image_projected_features_list, skip_features_list
 
     def _get_fused_features(
         self, 
-        projected_image_features_list: List[torch.Tensor], 
+        image_projected_features_list: List[torch.Tensor], 
         depth_features: Optional[torch.Tensor],
         is_image: bool,
     ) -> torch.Tensor:
         # Resize features to middle scale
         base_size = (self.fusion_size, self.fusion_size)
         resized_features_list = []
-        for image_features in projected_image_features_list:
-            if image_features.shape[-2:] != base_size:
-                image_features = nn.functional.interpolate(
-                    image_features,
+        for image_projected_features in image_projected_features_list:
+            if image_projected_features.shape[-2:] != base_size:
+                image_projected_features = nn.functional.interpolate(
+                    image_projected_features,
                     size=base_size,
                     mode="bilinear",
                     align_corners=False,
                 )
-            resized_features_list.append(image_features)
+            resized_features_list.append(image_projected_features)
 
         # Add depth information if needed
         if self.with_depth_information:
@@ -639,13 +624,9 @@ class LiveSAL(nn.Module):
             batch_size, channels, height, width = fused_features.shape
             fused_features = fused_features.unsqueeze(1).repeat(
                 1, self.output_channels, 1, 1, 1
-            )
-            fused_features = fused_features.view(
+            ).view(
                 batch_size * self.output_channels, channels, height, width
             )
-
-        del resized_features_list
-        torch.cuda.empty_cache()
 
         return fused_features
 
@@ -665,8 +646,8 @@ class LiveSAL(nn.Module):
     def _get_graph_features(self, fused_features: torch.Tensor) -> torch.Tensor:
         batch_size_sequence_length, channels, height, width = fused_features.shape
         fused_features_list = fused_features.view(
-            self.output_channels, -1, channels, height, width
-        )
+            -1, self.output_channels, channels, height, width
+        ).transpose(0, 1).contiguous()
 
         graph_features_list = self.graph_processor(fused_features_list)
         graph_features = graph_features_list.view(
@@ -682,7 +663,6 @@ class LiveSAL(nn.Module):
         self,
         fused_features: torch.Tensor,
         skip_features_list: List[torch.Tensor],
-        is_image: bool,
     ) -> torch.Tensor:
         # Organize features as independent samples
         batch_size_sequence_length, channels, height, width = fused_features.shape
@@ -760,8 +740,6 @@ class LiveSAL(nn.Module):
             )
         is_image = x.dim() == 4
 
-        print(">>>", x.shape)
-
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
 
@@ -771,7 +749,7 @@ class LiveSAL(nn.Module):
             depth_features = self._get_depth_features(x, is_image)
 
         # Project features and get skip features
-        projected_image_features_list, skip_features_list = self._get_projected_image_features_list(
+        image_projected_features_list, skip_features_list = self._get_image_projected_features_list(
             image_features_list=image_features_list,
             depth_features=depth_features,
             is_image=is_image,
@@ -781,11 +759,11 @@ class LiveSAL(nn.Module):
 
         # Fuse features
         fused_features = self._get_fused_features(
-            projected_image_features_list=projected_image_features_list, 
+            image_projected_features_list=image_projected_features_list, 
             depth_features=depth_features,
             is_image=is_image,
             )
-        del projected_image_features_list
+        del image_projected_features_list
         torch.cuda.empty_cache()
 
         # Add frame embeddings if needed
@@ -800,7 +778,6 @@ class LiveSAL(nn.Module):
         decoded_features_list = self._decode_features(
             fused_features=fused_features, 
             skip_features_list=skip_features_list, 
-            is_image=is_image
         )
         del fused_features
         torch.cuda.empty_cache()
