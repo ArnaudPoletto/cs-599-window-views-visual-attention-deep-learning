@@ -55,9 +55,9 @@ def get_criterion() -> nn.Module:
     mse_loss = MSELoss()
     criterion = CombinedLoss(
         {
-            "kl": (kl_loss, 1.0),
-            "corr": (corr_loss, 1.0),
-            "mse": (mse_loss, 1.0),
+            "kl": (kl_loss, 1.0), # TODO: remove hardocded values
+            "corr": (corr_loss, 1.0), # TODO: remove hardocded values
+            "mse": (mse_loss, 0.0),
         }
     )
 

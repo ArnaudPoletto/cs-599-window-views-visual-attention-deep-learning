@@ -331,7 +331,7 @@ class LiveSAL(nn.Module):
         with_graph_processing: bool,
         freeze_encoder: bool,
         with_depth_information: bool,
-        dropout_rate: float = 0.25, # TODO: remove hardcodd here, add in config
+        dropout_rate: float = 0.25, # TODO: remove hardcoded here, add in config
         fusion_level: Optional[int] = None,
     ):
         super(LiveSAL, self).__init__()

@@ -45,7 +45,7 @@ def get_criterion() -> nn.Module:
         {
             "kl": (kl_loss, 1.0), # TODO: remove hardocded values
             "corr": (corr_loss, 1.0), # TODO: remove hardocded values
-            "mse": (mse_loss, 1.0),
+            "mse": (mse_loss, 0.0),
         }
     )
 
