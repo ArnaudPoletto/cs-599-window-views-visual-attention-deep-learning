@@ -276,7 +276,7 @@ class ViDaS(nn.Module):
             saliency_out_channels=saliency_out_channels,
             attention_out_channels=attention_out_channels,
         )
-        saliency_map_shapes = self.encoder.get_saliency_map_shapes()
+        saliency_map_shapes = self.image_encoder.get_saliency_map_shapes()
         self.image_decoder = ViDaSDecoder(
             saliency_map_shapes=saliency_map_shapes,
             saliency_out_channels=saliency_out_channels,
