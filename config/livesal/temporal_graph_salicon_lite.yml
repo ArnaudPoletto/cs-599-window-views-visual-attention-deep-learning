@@ -2,16 +2,16 @@ dataset: "salicon" # "salicon" | "dhf1k"
 n_epochs: 5
 learning_rate: 1e-3
 weight_decay: 1e-6
-batch_size: 32
+batch_size: 8
 accumulation_steps: 1
-evaluation_steps: 40
+evaluation_steps: 160
 splits: [0.6, 0.3, 0.1]
 save_model: True
 use_scaler: True
 with_transforms: True
 
 hidden_channels: 64
-temporal_output: False
+temporal_output: True
 with_absolute_positional_embeddings: True
 with_relative_positional_embeddings: True
 n_heads: 1
