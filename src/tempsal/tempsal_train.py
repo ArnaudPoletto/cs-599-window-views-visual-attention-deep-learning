@@ -9,6 +9,7 @@ import argparse
 import subprocess
 import torch.nn as nn
 
+from src.losses.mse import MSELoss
 from src.utils.random import set_seed
 from src.models.tempsal import TempSAL
 from src.utils.parser import get_config
@@ -39,10 +40,12 @@ def get_model(
 def get_criterion() -> nn.Module:
     kl_loss = KLDivLoss(temperature=1.0, eps=1e-7)
     corr_loss = CorrelationCoefficientLoss(eps=1e-7)
+    mse_loss = MSELoss()
     criterion = CombinedLoss(
         {
             "kl": (kl_loss, 1.0), # TODO: remove hardocded values
             "corr": (corr_loss, 1.0), # TODO: remove hardocded values
+            "mse": (mse_loss, 1.0),
         }
     )
 
