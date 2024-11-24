@@ -18,9 +18,9 @@ class ImageDecoder(nn.Module):
 
     def __init__(
         self,
-        features_channels: List[int],  # [96, 270, 1080, 2160, 4320]
-        hidden_channels: List[int],  # [64, 96, 270, 256, 512]
-        features_sizes: List[int],  # [165, 83, 42, 21, 11]
+        features_channels: List[int],
+        hidden_channels: List[int],
+        features_sizes: List[int],
         output_channels: int,
     ) -> None:
         """

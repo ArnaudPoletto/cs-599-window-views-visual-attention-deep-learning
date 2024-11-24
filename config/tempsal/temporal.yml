@@ -4,10 +4,10 @@ weight_decay: 1e-6
 batch_size: 128
 accumulation_steps: 1
 evaluation_steps: 10
-splits: [0.6, 0.3, 0.1]
+splits: [0.7, 0.2, 0.1]
 save_model: True
 use_scaler: True
 with_transforms: True
 
-decoder_output_channels: 5
+temporal_output: True
 freeze_encoder: True

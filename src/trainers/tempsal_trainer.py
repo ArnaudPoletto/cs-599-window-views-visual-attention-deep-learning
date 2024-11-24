@@ -30,7 +30,7 @@ class TempSALTrainer(Trainer):
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
             "model_name": self.model.__class__.__name__,
-            "output_channels": self.model.output_channels,
+            "temporal_output": self.model.temporal_output,
             "hidden_channels_list": self.model.hidden_channels_list,
             "freeze_encoder": self.model.freeze_encoder,
             

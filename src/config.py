@@ -35,9 +35,6 @@ PROCESSED_DHF1K_PATH = f"{DHF1K_PATH}/processed"
 FIXATION_DATA_PATH = f"{GAZE_PATH}/fixation_data.csv"
 
 SEQUENCE_LENGTH = 5
-BATCH_SIZE = 2
-SPLITS = (0.7, 0.2, 0.1)
-N_WORKERS = 4
 
 SEED = 0
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
