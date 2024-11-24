@@ -333,7 +333,6 @@ class LiveSAL(nn.Module):
         freeze_encoder: bool,
         with_depth_information: bool,
         dropout_rate: float,
-        fusion_level: Optional[int] = None,
     ):
         super(LiveSAL, self).__init__()
 
@@ -349,7 +348,7 @@ class LiveSAL(nn.Module):
         self.with_depth_information = with_depth_information
         self.dropout_rate = dropout_rate
 
-        # Get normalizations
+        # Get normalization parameters for inputs entering encoders or estimators
         self.register_buffer(
             "image_mean",
             torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
@@ -372,65 +371,71 @@ class LiveSAL(nn.Module):
                 persistent=False,
             )
 
-        # Get encoder and freeze weights if needed
+        # Get encoder
         self.image_encoder = ImageEncoder(
             freeze=freeze_encoder,
         )
+        # The fusion level is the depth of the encoder, starting at 0 with the input
+        self.fusion_level = len(self.image_encoder.feature_sizes)
+        # The fusion size is the size of the last feature map of the encoder
+        self.fusion_size = self.image_encoder.feature_sizes[self.fusion_level - 1]
+        print("FUSION LEVEL SHOULD BE 4", self.fusion_level)
+        print("FUSION SIZE SHOULD BE 11", self.fusion_size)
+
         if with_depth_information:
             self.depth_estimator = DepthEstimator(
                 freeze=freeze_encoder,
             )
-
-        # Set fusion level and size
-        if fusion_level is None:
-            fusion_level = len(self.image_encoder.feature_sizes) // 2
-            print(f"➡️ Default fusion level set to {fusion_level}.")
-        if fusion_level < 0:
-            raise ValueError(
-                f"❌ Fusion level must be greater than or equal to 0, got {fusion_level}."
+            self.depth_attention_layers = nn.ModuleList(
+                [
+                    nn.Sequential(
+                        nn.Conv2d(
+                            in_channels=1,
+                            out_channels=hidden_channels,
+                            kernel_size=3,
+                            padding=1,
+                            bias=False,
+                        ),
+                        nn.BatchNorm2d(hidden_channels),
+                        nn.ReLU(inplace=True),
+                        nn.Dropout2d(dropout_rate),
+                        nn.Conv2d(
+                            in_channels=hidden_channels,
+                            out_channels=hidden_channels,
+                            kernel_size=3,
+                            padding=1,
+                            bias=False,
+                        ),
+                        nn.BatchNorm2d(hidden_channels),
+                        nn.Dropout2d(dropout_rate),
+                        nn.Sigmoid(),
+                    )
+                    for _ in range(self.fusion_level)
+                ]
             )
-        if fusion_level >= len(self.image_encoder.feature_sizes):
-            raise ValueError(
-                f"❌ Fusion level must be less than {len(self.image_encoder.feature_sizes)}, got {fusion_level}."
-            )
-        self.fusion_level = fusion_level
-        self.fusion_size = self.image_encoder.feature_sizes[self.fusion_level]
 
         # Projection layers to project encoded features to a common space
-        # Add 2 spatial awareness layers with depthwise separable 3x3 conv for efficiency
         self.image_projections = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
                         in_channels=in_ch,
+                        out_channels=max(in_ch // 2, hidden_channels),
+                        kernel_size=1,
+                        bias=False,
+                    ),
+                    nn.BatchNorm2d(max(in_ch // 2, hidden_channels)),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout2d(dropout_rate),
+                    nn.Conv2d(
+                        in_channels=max(in_ch // 2, hidden_channels),
                         out_channels=hidden_channels,
                         kernel_size=1,
                         bias=False,
                     ),
                     nn.BatchNorm2d(hidden_channels),
                     nn.ReLU(inplace=True),
-                     nn.Dropout2d(dropout_rate),
-                    nn.Conv2d(
-                        in_channels=hidden_channels,
-                        out_channels=hidden_channels,
-                        kernel_size=3,
-                        padding=1,
-                        groups=hidden_channels,
-                        bias=False,
-                    ),
-                    nn.BatchNorm2d(hidden_channels),
-                    nn.ReLU(inplace=True),
-                     nn.Dropout2d(dropout_rate),
-                    nn.Conv2d(
-                        in_channels=hidden_channels,
-                        out_channels=hidden_channels,
-                        kernel_size=3,
-                        padding=1,
-                        groups=hidden_channels,
-                        bias=False,
-                    ),
-                    nn.BatchNorm2d(hidden_channels),
-                    nn.ReLU(inplace=True),
+                    nn.Dropout2d(dropout_rate),
                 )
                 for in_ch in self.image_encoder.feature_channels
             ]
@@ -438,8 +443,6 @@ class LiveSAL(nn.Module):
 
         # Fusion layer to combine all features
         fusion_in_channels = hidden_channels * len(self.image_projections)
-        if with_depth_information:
-            fusion_in_channels += 1
         self.fusion = nn.Sequential(
             nn.Conv2d(
                 in_channels=fusion_in_channels,
@@ -473,8 +476,6 @@ class LiveSAL(nn.Module):
 
         # Decoder layers
         decoder_in_channels = hidden_channels * 2
-        if with_depth_information:
-            decoder_in_channels += 1
         self.decoder = nn.ModuleList(
             [
                 nn.Sequential(
@@ -499,7 +500,7 @@ class LiveSAL(nn.Module):
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
                 )
-                for _ in range(fusion_level)
+                for _ in range(self.fusion_level)
             ]
         )
 
@@ -554,8 +555,8 @@ class LiveSAL(nn.Module):
         image_features_list = self.image_encoder(x_image)
 
         return image_features_list
-
-    def _get_depth_features(
+    
+    def _get_depth_features_list(
         self, x: torch.Tensor, is_image: bool
     ) -> List[torch.Tensor]:
         # Flatten batch_size and sequence_length for video inputs to pass through the
@@ -565,14 +566,26 @@ class LiveSAL(nn.Module):
 
         # Normalize and get depth features
         x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
-        depth_features = self.depth_estimator(x_depth)
+        depth_estimation = self.depth_estimator(x_depth)
 
-        return depth_features
+        depth_features_list = []
+        for target_size, depth_attention_layer in zip(
+            self.image_encoder.feature_sizes, self.depth_attention_layers
+        ):
+            resized_depth_estimation = nn.functional.interpolate(
+                depth_estimation, 
+                size=target_size, 
+                mode="bilinear", 
+                align_corners=False
+            )
+            depth_features = depth_attention_layer(resized_depth_estimation)
+            depth_features_list.append(depth_features)
+
+        return depth_features_list
 
     def _get_image_projected_features_list(
         self,
         image_features_list: List[torch.Tensor],
-        depth_features: Optional[torch.Tensor],
         is_image: bool,
     ) -> List[torch.Tensor]:
         image_projected_features_list = []
@@ -583,20 +596,6 @@ class LiveSAL(nn.Module):
         # Get skip features
         skip_features_list = image_projected_features_list[: self.fusion_level]
         
-        # Add depth information if needed
-        if self.with_depth_information:
-            new_skip_features_list = []
-            for skip_features in skip_features_list:
-                if depth_features.shape[-2:] != skip_features.shape[-2:]:
-                    depth_resized_features = nn.functional.interpolate(
-                        depth_features,
-                        size=skip_features.shape[-2:],
-                        mode="bilinear",
-                        align_corners=False,
-                    )
-                new_skip_features_list.append(torch.cat([skip_features, depth_resized_features], dim=1))
-            skip_features_list = new_skip_features_list
-
         # Repeat image skip features for graph processing
         if is_image:
             resized_skip_features_list = []
@@ -610,14 +609,11 @@ class LiveSAL(nn.Module):
                 resized_skip_features_list.append(skip_features)
             skip_features_list = resized_skip_features_list
 
-        print("SKIP_FEATURES", [skip_features.shape for skip_features in skip_features_list])
-
         return image_projected_features_list, skip_features_list
 
     def _get_fused_features(
         self, 
         image_projected_features_list: List[torch.Tensor], 
-        depth_features: Optional[torch.Tensor],
         is_image: bool,
     ) -> torch.Tensor:
         # Resize features to middle scale
@@ -632,17 +628,6 @@ class LiveSAL(nn.Module):
                     align_corners=False,
                 )
             resized_features_list.append(image_projected_features)
-
-        # Add depth information if needed
-        if self.with_depth_information:
-            if depth_features.shape[-2:] != base_size:
-                depth_features = nn.functional.interpolate(
-                    depth_features,
-                    size=base_size,
-                    mode="bilinear",
-                    align_corners=False,
-                )
-            resized_features_list.append(depth_features)
 
         # Fuse features
         fused_features = self.fusion(torch.cat(resized_features_list, dim=1))
@@ -717,7 +702,6 @@ class LiveSAL(nn.Module):
         ):
             for i, decoder_block in enumerate(self.decoder):
                 skip_feat = skip_features[-(i + 1)]
-                print("SKIP", skip_feat.shape)
                 if fused_features.shape[-2:] != skip_feat.shape[-2:]:
                     fused_features = nn.functional.interpolate(
                         fused_features,
@@ -725,10 +709,8 @@ class LiveSAL(nn.Module):
                         mode="bilinear",
                         align_corners=False,
                     )
-                print("FUSED", fused_features.shape)
                 fused_features = torch.cat([fused_features, skip_feat], dim=1)
                 fused_features = decoder_block(fused_features)
-                print("AFTER_DECODER_BLOCK", fused_features.shape)
             decoded_features_list.append(fused_features)
         decoded_features_list = torch.stack(decoded_features_list, dim=0)
 
@@ -781,29 +763,25 @@ class LiveSAL(nn.Module):
 
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
+        print("IMAGE FEAUTRES LIST", [image_features.shape for image_features in image_features_list])
 
         # Get depth features if needed
         depth_features = None
         if self.with_depth_information:
-            depth_features = self._get_depth_features(x, is_image)
+            depth_features_list = self._get_depth_features_list(x, is_image)
+            print("DEPTH FEATURES LIST", [depth_features.shape for depth_features in depth_features_list])
 
         # Project features and get skip features
         image_projected_features_list, skip_features_list = self._get_image_projected_features_list(
             image_features_list=image_features_list,
-            depth_features=depth_features,
             is_image=is_image,
         )
-        del image_features_list
-        torch.cuda.empty_cache()
 
         # Fuse features
         fused_features = self._get_fused_features(
             image_projected_features_list=image_projected_features_list, 
-            depth_features=depth_features,
             is_image=is_image,
-            )
-        del image_projected_features_list
-        torch.cuda.empty_cache()
+        )
 
         # Add frame embeddings if needed
         if self.with_absolute_positional_embeddings:
@@ -818,12 +796,8 @@ class LiveSAL(nn.Module):
             fused_features=fused_features, 
             skip_features_list=skip_features_list, 
         )
-        del fused_features
-        torch.cuda.empty_cache()
 
         # Get output
         outputs = self._get_outputs(decoded_features_list, x.shape[-2:])
-        del decoded_features_list
-        torch.cuda.empty_cache()
 
         return outputs

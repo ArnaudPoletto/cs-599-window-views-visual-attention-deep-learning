@@ -85,7 +85,6 @@ def get_model(
     freeze_encoder: bool,
     with_depth_information: bool,
     dropout_rate: float,
-    fusion_level: int,
 ) -> nn.Module:
     return LiveSAL(
         hidden_channels=hidden_channels,
@@ -99,7 +98,6 @@ def get_model(
         freeze_encoder=freeze_encoder,
         with_depth_information=with_depth_information,
         dropout_rate=dropout_rate,
-        fusion_level=fusion_level,
     ).to(DEVICE)
 
 
@@ -200,7 +198,6 @@ def main() -> None:
     freeze_encoder = bool(config["freeze_encoder"])
     with_depth_information = bool(config["with_depth_information"])
     dropout_rate = float(config["dropout_rate"])
-    fusion_level = int(config["fusion_level"]) if "fusion_level" in config else None
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataloaders, model, criterion, optimizer, and trainer
@@ -222,7 +219,6 @@ def main() -> None:
         freeze_encoder=freeze_encoder,
         with_depth_information=with_depth_information,
         dropout_rate=dropout_rate,
-        fusion_level=fusion_level,
     )
     criterion = get_criterion()
     optimizer = get_optimizer(
