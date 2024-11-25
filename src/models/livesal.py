@@ -578,21 +578,22 @@ class LiveSAL(nn.Module):
         image_projected_features_list: List[torch.Tensor],
         is_image: bool,
     ) -> torch.Tensor:
-        # Resize features to middle scale
-        base_size = (self.fusion_size, self.fusion_size)
-        resized_features_list = []
-        for image_projected_features in image_projected_features_list:
-            if image_projected_features.shape[-2:] != base_size:
-                image_projected_features = nn.functional.interpolate(
-                    image_projected_features,
-                    size=base_size,
-                    mode="bilinear",
-                    align_corners=False,
-                )
-            resized_features_list.append(image_projected_features)
+        fused_features = image_projected_features_list[-1]
+        # # Resize features to middle scale
+        # base_size = (self.fusion_size, self.fusion_size)
+        # resized_features_list = []
+        # for image_projected_features in image_projected_features_list:
+        #     if image_projected_features.shape[-2:] != base_size:
+        #         image_projected_features = nn.functional.interpolate(
+        #             image_projected_features,
+        #             size=base_size,
+        #             mode="bilinear",
+        #             align_corners=False,
+        #         )
+        #     resized_features_list.append(image_projected_features)
 
-        # Fuse features
-        fused_features = self.fusion(torch.cat(resized_features_list, dim=1))
+        # # Fuse features
+        # fused_features = self.fusion(torch.cat(resized_features_list, dim=1))
 
         # Repeat image features for graph processing
         if is_image:
