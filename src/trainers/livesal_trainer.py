@@ -42,7 +42,6 @@ class LiveSALTrainer(Trainer):
             "with_depth_information": self.model.with_depth_information,
             "dropout_rate": self.model.dropout_rate,
             "fusion_level": self.model.fusion_level,
-            "fusion_size": self.model.fusion_size,
 
         }
 

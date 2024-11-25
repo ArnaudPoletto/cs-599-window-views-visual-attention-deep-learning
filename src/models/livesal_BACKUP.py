@@ -76,13 +76,11 @@ class GraphProcessor(nn.Module):
 
         self.hidden_channels = hidden_channels
         self.with_relative_positional_embeddings = with_relative_positional_embeddings
-        self.fusion_size = fusion_size
         self.n_heads = n_heads
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
-        self.dropout_rate = dropout_rate
-        self.head_dim = hidden_channels // n_heads
         self.scale = hidden_channels**-0.5
+        self.head_dim = hidden_channels // n_heads
 
         self.spatial_dropout = nn.Dropout2d(dropout_rate)
         self.temporal_dropout = nn.Dropout3d(dropout_rate)
@@ -193,8 +191,8 @@ class GraphProcessor(nn.Module):
         )
 
         self.norm = nn.LayerNorm(
-            [hidden_channels, fusion_size, fusion_size]
-        )
+            [hidden_channels, 11, 11]
+        )  # TODO: remove hardocded size, fusion_size?
 
     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, channels, height, width = x.shape
@@ -381,6 +379,8 @@ class LiveSAL(nn.Module):
         )
         # The fusion level is the depth of the encoder, starting at 1 at the first downsampled level
         self.fusion_level = len(self.image_encoder.feature_sizes)
+        # The fusion size is the size of the last feature map of the encoder
+        self.fusion_size = self.image_encoder.feature_sizes[self.fusion_level - 1]
 
         if with_depth_information:
             self.depth_estimator = DepthEstimator(
@@ -388,7 +388,7 @@ class LiveSAL(nn.Module):
             )
 
         # Projection layers to project encoded features to a common space
-        self.image_projection_layers = nn.ModuleList(
+        self.image_projections = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
@@ -414,23 +414,46 @@ class LiveSAL(nn.Module):
             ]
         )
 
+        # Fusion layer to combine all features
+        fusion_in_channels = hidden_channels * len(self.image_projections)
+        self.fusion = nn.Sequential(
+            nn.Conv2d(
+                in_channels=fusion_in_channels,
+                out_channels=hidden_channels,
+                kernel_size=1,
+                padding=0,
+                bias=False,
+            ),
+            nn.BatchNorm2d(hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(dropout_rate),
+        )
+
+        if with_absolute_positional_embeddings:
+            self.absolute_positional_embeddings = nn.Parameter(
+                torch.randn(
+                    SEQUENCE_LENGTH, hidden_channels, self.fusion_size, self.fusion_size
+                )
+            )
+
         if with_graph_processing:
             self.graph_processor = GraphProcessor(
                 hidden_channels=hidden_channels,
                 with_relative_positional_embeddings=with_relative_positional_embeddings,
                 n_heads=n_heads,
                 neighbor_radius=neighbor_radius,
-                fusion_size=self.image_encoder.feature_sizes[-1],
+                fusion_size=self.fusion_size,
                 n_iterations=n_iterations,
                 dropout_rate=self.dropout_rate,
             )
 
         # Decoder layers
-        self.decoder_layers = nn.ModuleList(
+        decoder_in_channels = hidden_channels * 2
+        self.decoder = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
-                        in_channels=hidden_channels * 2,
+                        in_channels=decoder_in_channels,
                         out_channels=hidden_channels,
                         kernel_size=3,
                         padding=1,
@@ -455,65 +478,41 @@ class LiveSAL(nn.Module):
         )
 
         # Final layer
-        if temporal_output:
-            self.final_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels // 2,
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels // 2),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    in_channels=hidden_channels // 2,
-                    out_channels=1,
-                    kernel_size=3,
-                    padding=1,
-                    bias=True,
-                ),
-                nn.Sigmoid(),
-            )
-        else:
-            self.final_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels // 2,
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels // 2),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    in_channels=hidden_channels // 2,
-                    out_channels=1,
-                    kernel_size=3,
-                    padding=1,
-                    bias=True,
-                ),
-                nn.ReLU(inplace=True),
-            )
-            self.final_merge_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=SEQUENCE_LENGTH,
-                    out_channels=1,
-                    kernel_size=3,
-                    padding=1,
-                    bias=True,
-                ),
-                nn.Sigmoid(),
-            )
+        final_layer_in_channels = hidden_channels
+        final_layer_hidden_channels = hidden_channels // 2
+        if not temporal_output:
+            final_layer_in_channels *= SEQUENCE_LENGTH
+            final_layer_hidden_channels *= SEQUENCE_LENGTH
+        self.final_layer = nn.Sequential(
+            nn.Conv2d(
+                in_channels=final_layer_in_channels,
+                out_channels=final_layer_hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(final_layer_hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=final_layer_hidden_channels,
+                out_channels=1,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            ),
+            nn.Sigmoid(),
+        )
+
+        self.sigmoid = nn.Sigmoid()
 
     def _normalize_input(
         self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
     ) -> torch.Tensor:
         x = x.clone()
-
+        
         if x.max() > 1.0:
             x = x / 255.0
-
+            
         normalized_x = (x - mean) / std
 
         return normalized_x
@@ -531,6 +530,20 @@ class LiveSAL(nn.Module):
         image_features_list = self.image_encoder(x_image)
 
         return image_features_list
+    
+    def _get_depth_estimation(
+        self, x: torch.Tensor, is_image: bool
+    ) -> List[torch.Tensor]:
+        # Flatten batch_size and sequence_length for video inputs to pass through the
+        if not is_image:
+            batch_size, sequence_length, channels, height, width = x.shape
+            x = x.view(-1, channels, height, width)
+
+        # Normalize and get depth estimation
+        x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
+        depth_estimation = self.depth_estimator(x_depth)
+
+        return depth_estimation
 
     def _get_image_projected_features_list(
         self,
@@ -538,74 +551,167 @@ class LiveSAL(nn.Module):
         is_image: bool,
     ) -> List[torch.Tensor]:
         image_projected_features_list = []
-        for image_features, image_projection_layer in zip(
-            image_features_list, self.image_projection_layers
-        ):
-            image_projected_features = image_projection_layer(image_features)
-
-            if is_image:
-                image_projected_features = image_projected_features.unsqueeze(1).repeat(
-                    1, SEQUENCE_LENGTH, 1, 1, 1
-                )
-                batch_size, sequence_length, channels, height, width = image_projected_features.shape
-                image_projected_features = image_projected_features.view(-1, channels, height, width)
+        for image_features, image_projection in zip(image_features_list, self.image_projections):
+            image_projected_features = image_projection(image_features)
             image_projected_features_list.append(image_projected_features)
 
-        return image_projected_features_list
+        # Get skip features
+        skip_features_list = image_projected_features_list[: self.fusion_level - 1]
+        
+        # Repeat image skip features for graph processing
+        if is_image:
+            resized_skip_features_list = []
+            for skip_features in skip_features_list:
+                batch_size, channels, height, width = skip_features.shape
+                skip_features = skip_features.unsqueeze(1).repeat(
+                    1, SEQUENCE_LENGTH, 1, 1, 1
+                ).view(
+                    batch_size * SEQUENCE_LENGTH, channels, height, width
+                )
+                resized_skip_features_list.append(skip_features)
+            skip_features_list = resized_skip_features_list
 
-    def _get_graph_features(
-        self, image_features: torch.Tensor, graph_processor: GraphProcessor
+        return image_projected_features_list, skip_features_list
+
+    def _get_fused_features(
+        self, 
+        image_projected_features_list: List[torch.Tensor],
+        is_image: bool,
     ) -> torch.Tensor:
-        batch_size_sequence_length, channels, height, width = image_features.shape
-        transformed_features = (
-            image_features.view(-1, SEQUENCE_LENGTH, channels, height, width)
-            .transpose(0, 1)
-            .contiguous()
-        )
+        fused_features = image_projected_features_list[-1]
+        # # Resize features to middle scale
+        # base_size = (self.fusion_size, self.fusion_size)
+        # resized_features_list = []
+        # for image_projected_features in image_projected_features_list:
+        #     if image_projected_features.shape[-2:] != base_size:
+        #         image_projected_features = nn.functional.interpolate(
+        #             image_projected_features,
+        #             size=base_size,
+        #             mode="bilinear",
+        #             align_corners=False,
+        #         )
+        #     resized_features_list.append(image_projected_features)
 
-        graph_features = graph_processor(transformed_features)
-        graph_features = (
-            graph_features.transpose(0, 1)
-            .contiguous()
-            .view(batch_size_sequence_length, channels, height, width)
+        # # Fuse features
+        # fused_features = self.fusion(torch.cat(resized_features_list, dim=1))
+
+        # Repeat image features for graph processing
+        if is_image:
+            batch_size, channels, height, width = fused_features.shape
+            fused_features = fused_features.unsqueeze(1).repeat(
+                1, SEQUENCE_LENGTH, 1, 1, 1
+            ).view(
+                batch_size * SEQUENCE_LENGTH, channels, height, width
+            )
+
+        return fused_features
+
+    def _add_absolute_positional_embeddings(
+        self, fused_features: torch.Tensor
+    ) -> torch.Tensor:
+        batch_size_sequence_length, channels, height, width = fused_features.shape
+        fused_features_list = fused_features.view(
+            -1, SEQUENCE_LENGTH, channels, height, width
+        )
+        fused_features = (
+            fused_features_list + self.absolute_positional_embeddings.unsqueeze(0)
+        ).view(batch_size_sequence_length, channels, height, width)
+
+        return fused_features
+
+    def _get_graph_features(self, fused_features: torch.Tensor) -> torch.Tensor:
+        batch_size_sequence_length, channels, height, width = fused_features.shape
+        fused_features_list = fused_features.view(
+            -1, SEQUENCE_LENGTH, channels, height, width
+        ).transpose(0, 1).contiguous()
+
+        graph_features_list = self.graph_processor(fused_features_list)
+        graph_features = graph_features_list.view(
+            batch_size_sequence_length, channels, height, width
         )
 
         # Add residual connection
-        graph_features = graph_features + image_features
+        graph_features = graph_features + fused_features
 
         return graph_features
 
-    def _get_decoded_features(
+    def _decode_features(
         self,
-        image_features_list: List[torch.Tensor],
+        fused_features: torch.Tensor,
+        skip_features_list: List[torch.Tensor],
     ) -> torch.Tensor:
-        x = image_features_list[-1]
-        y = image_features_list[-2]
-        for i, decoder_layer in enumerate(self.decoder_layers):
-            x = nn.functional.interpolate(
-                x, size=y.shape[-2:], mode="bilinear", align_corners=False
-            )
-            x = torch.cat([x, y], dim=1)
-            x = decoder_layer(x)
-            if i < len(self.decoder_layers) - 1:
-                y = image_features_list[-(i + 3)]
-
-        return x
-
-    def _get_output_feature(
-        self, decoded_features: torch.Tensor, output_shape: Tuple[int, int]
-    ) -> torch.Tensor:
-        decoded_features = nn.functional.interpolate(
-            decoded_features, size=output_shape, mode="bilinear", align_corners=False
+        # Organize features as independent samples
+        batch_size_sequence_length, channels, height, width = fused_features.shape
+        fused_features_list = (
+            fused_features.view(-1, SEQUENCE_LENGTH, channels, height, width)
+            .transpose(0, 1)
+            .contiguous()
         )
-        output_feature = self.final_layer(decoded_features)
-        output_feature = output_feature.view(-1, SEQUENCE_LENGTH, *output_shape)
+        
+        reshaped_skip_features_list = []
+        for skip_features in skip_features_list:
+            batch_size_sequence_length, channels, height, width = skip_features.shape
+            reshaped_skip_features = (
+                skip_features.view(-1, SEQUENCE_LENGTH, channels, height, width)
+                .transpose(0, 1)
+                .contiguous()
+            )
+            reshaped_skip_features_list.append(reshaped_skip_features)
+        skip_features_list = list(zip(*reshaped_skip_features_list))
 
-        if not self.temporal_output:
-            output_feature = self.final_merge_layer(output_feature).squeeze(1)
+        # Decode sample features sequentially
+        decoded_features_list = []
+        for fused_features, skip_features in zip(
+            fused_features_list, skip_features_list
+        ):
+            for i, decoder_block in enumerate(self.decoder):
+                skip_feat = skip_features[-(i + 1)]
+                fused_features = nn.functional.interpolate(
+                    fused_features,
+                    size=skip_feat.shape[-2:],
+                    mode="bilinear",
+                    align_corners=False,
+                )
+                fused_features = torch.cat([fused_features, skip_feat], dim=1)
+                fused_features = decoder_block(fused_features)
+            decoded_features_list.append(fused_features)
+        decoded_features_list = torch.stack(decoded_features_list, dim=0)
 
-        return output_feature
+        return decoded_features_list
 
+    def _get_outputs(
+        self, decoded_features_list: torch.Tensor, output_shape: Tuple[int, int]
+    ) -> torch.Tensor:
+        if self.temporal_output:
+            # Upsample to original size and pass through final layer
+            outputs = []
+            for decoded_features in decoded_features_list:
+                decoded_features = nn.functional.interpolate(
+                    decoded_features,
+                    size=output_shape,
+                    mode="bilinear",
+                    align_corners=False,
+                )
+                output = self.final_layer(decoded_features)
+                outputs.append(output)
+            outputs = torch.stack(outputs, dim=0)
+            outputs = outputs.squeeze(2).transpose(0, 1).contiguous()
+        else:
+            sequence_length, batch_size, channels, height, width = decoded_features_list.shape
+            decoded_features_list = decoded_features_list.transpose(0, 1).contiguous()
+            decoded_features_list = decoded_features_list.view(
+                batch_size, sequence_length * channels, height, width
+            )
+            decoded_features_list = nn.functional.interpolate(
+                decoded_features_list,
+                size=output_shape,
+                mode="bilinear",
+                align_corners=False,
+            )
+            outputs = self.final_layer(decoded_features_list)
+            outputs = outputs.squeeze(1)
+
+        return outputs
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() not in [4, 5]:
@@ -622,24 +728,32 @@ class LiveSAL(nn.Module):
         image_features_list = self._get_image_features_list(x, is_image)
 
         # Project features and get skip features
-        image_features_list = self._get_image_projected_features_list(
+        image_projected_features_list, skip_features_list = self._get_image_projected_features_list(
             image_features_list=image_features_list,
             is_image=is_image,
         )
 
+        # Fuse features
+        fused_features = self._get_fused_features(
+            image_projected_features_list=image_projected_features_list, 
+            is_image=is_image,
+        )
+
+        # Add frame embeddings if needed
+        if self.with_absolute_positional_embeddings:
+            fused_features = self._add_absolute_positional_embeddings(fused_features)
+
         # Process features if needed
         if self.with_graph_processing:
-            image_features_list[-1] = self._get_graph_features(
-                image_features=image_features_list[-1],
-                graph_processor=self.graph_processor,
-            )
+            fused_features = self._get_graph_features(fused_features)
 
         # Decode features
-        decoded_features = self._get_decoded_features(
-            image_features_list=image_features_list,
+        decoded_features_list = self._decode_features(
+            fused_features=fused_features, 
+            skip_features_list=skip_features_list, 
         )
 
         # Get output
-        output_feature = self._get_output_feature(decoded_features, x.shape[-2:])
+        outputs = self._get_outputs(decoded_features_list, x.shape[-2:])
 
-        return output_feature
+        return outputs
