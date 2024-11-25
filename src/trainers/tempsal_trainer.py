@@ -61,4 +61,4 @@ class TempSALTrainer(Trainer):
             ground_truth = global_ground_truth
         loss = self.criterion(outputs, ground_truth)
 
-        return loss, None, None # TODO: return None for now
+        return loss, outputs, ground_truth

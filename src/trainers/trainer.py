@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader
 
+from src.metrics.metrics import Metrics
 from src.config import MODELS_PATH
 
 
@@ -114,29 +115,39 @@ class Trainer(ABC):
                         "val_loss": f"{self.eval_val_loss:.4f}",
                     }
                 )
-                wandb.log(
-                    {
-                        "train_loss": self.eval_train_loss,
-                        "val_loss": self.eval_val_loss,
-                    }
-                )
+
+                # Log to WandB all statistics
+                stats = {key: value for key, value in stats.items() if key != "loss"}
+                stats.update({"train_loss": self.eval_train_loss, "val_loss": self.eval_val_loss})
+                wandb.log(stats)
 
     def _evaluate(self, loader: DataLoader) -> dict[str, float]:
         self.model.eval()
 
         total_val_loss = 0
         with torch.no_grad():
+            metrics = {}
             for batch in loader:
-                val_loss, _, _ = self._forward_pass(batch)
-                total_val_loss += val_loss.item()
-        total_val_loss /= len(loader)
+                # Get loss and metrics
+                val_loss, prediction, target = self._forward_pass(batch)
 
-        statistics = {
-            "loss": total_val_loss,
-        }
+                if "loss" not in metrics:
+                    metrics["loss"] = []
+                metrics["loss"].append(val_loss.item())
+
+                new_metrics = Metrics().get_metrics(prediction, target, center_bias_prior=None) # TODO: add center bias prior
+                for key, value in new_metrics.items():
+                    if key not in metrics:
+                        metrics[key] = []
+                    metrics[key].append(value)
+
+        # Normalize metrics
+        for key, value in metrics.items():
+            metrics[key] = torch.mean(torch.tensor(value)).item()
+
         self.model.train()
 
-        return statistics
+        return metrics
 
     def _get_name(self, optimizer: Optimizer, n_epochs: int, learning_rate: int) -> str:
         return self.name

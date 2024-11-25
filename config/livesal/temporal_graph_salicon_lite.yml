@@ -4,8 +4,8 @@ learning_rate: 1e-3
 weight_decay: 1e-6
 batch_size: 8
 accumulation_steps: 1
-evaluation_steps: 160
-splits: [0.6, 0.3, 0.1]
+evaluation_steps: 10
+splits: [0.9, 0.05, 0.05]
 save_model: True
 use_scaler: True
 with_transforms: True
@@ -19,5 +19,5 @@ neighbor_radius: 1
 n_iterations: 3
 with_graph_processing: True
 freeze_encoder: True
-with_depth_information: True
+with_depth_information: False
 dropout_rate: 0.0

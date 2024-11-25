@@ -165,6 +165,7 @@ class GraphProcessor(nn.Module):
                 bias=True,
             ),
             nn.AdaptiveAvgPool2d(1),
+            nn.Dropout(dropout_rate),
             nn.Sigmoid(),
         )
         self.inter_output = nn.Sequential(
@@ -177,6 +178,7 @@ class GraphProcessor(nn.Module):
             ),
             nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
             nn.ReLU(inplace=True),
+            nn.Dropout(dropout_rate),
         )
 
         self.intra_inter_alpha = nn.Parameter(torch.tensor(0.5))
@@ -384,28 +386,6 @@ class LiveSAL(nn.Module):
             self.depth_estimator = DepthEstimator(
                 freeze=freeze_encoder,
             )
-            self.depth_attention_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=1,
-                    out_channels=hidden_channels,
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels),
-                nn.ReLU(inplace=True),
-                nn.Dropout2d(dropout_rate),
-                nn.Conv2d(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels,
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels),
-                nn.Dropout2d(dropout_rate),
-                nn.Sigmoid(),
-            )
 
         # Projection layers to project encoded features to a common space
         self.image_projections = nn.ModuleList(
@@ -499,20 +479,22 @@ class LiveSAL(nn.Module):
 
         # Final layer
         final_layer_in_channels = hidden_channels
+        final_layer_hidden_channels = hidden_channels // 2
         if not temporal_output:
             final_layer_in_channels *= SEQUENCE_LENGTH
+            final_layer_hidden_channels *= SEQUENCE_LENGTH
         self.final_layer = nn.Sequential(
             nn.Conv2d(
                 in_channels=final_layer_in_channels,
-                out_channels=hidden_channels // 2,
+                out_channels=final_layer_hidden_channels,
                 kernel_size=3,
                 padding=1,
                 bias=False,
             ),
-            nn.BatchNorm2d(hidden_channels // 2),
+            nn.BatchNorm2d(final_layer_hidden_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels=hidden_channels // 2,
+                in_channels=final_layer_hidden_channels,
                 out_channels=1,
                 kernel_size=3,
                 padding=1,
@@ -549,7 +531,7 @@ class LiveSAL(nn.Module):
 
         return image_features_list
     
-    def _get_depth_attention(
+    def _get_depth_estimation(
         self, x: torch.Tensor, is_image: bool
     ) -> List[torch.Tensor]:
         # Flatten batch_size and sequence_length for video inputs to pass through the
@@ -561,17 +543,7 @@ class LiveSAL(nn.Module):
         x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
         depth_estimation = self.depth_estimator(x_depth)
 
-        # Get depth attention, a weighting map to inject depth information into image features
-        base_size = (self.fusion_size, self.fusion_size)
-        resized_depth_estimation = nn.functional.interpolate(
-            depth_estimation, 
-            size=base_size, 
-            mode="bilinear", 
-            align_corners=False
-        )
-        depth_attention = self.depth_attention_layer(resized_depth_estimation)
-
-        return depth_attention
+        return depth_estimation
 
     def _get_image_projected_features_list(
         self,
@@ -604,7 +576,6 @@ class LiveSAL(nn.Module):
     def _get_fused_features(
         self, 
         image_projected_features_list: List[torch.Tensor],
-        depth_attention: Optional[torch.Tensor], 
         is_image: bool,
     ) -> torch.Tensor:
         # Resize features to middle scale
@@ -622,10 +593,6 @@ class LiveSAL(nn.Module):
 
         # Fuse features
         fused_features = self.fusion(torch.cat(resized_features_list, dim=1))
-
-        # Apply depth attention if needed
-        if self.with_depth_information:
-            fused_features = fused_features * depth_attention
 
         # Repeat image features for graph processing
         if is_image:
@@ -679,6 +646,7 @@ class LiveSAL(nn.Module):
             .transpose(0, 1)
             .contiguous()
         )
+        
         reshaped_skip_features_list = []
         for skip_features in skip_features_list:
             batch_size_sequence_length, channels, height, width = skip_features.shape
@@ -697,13 +665,12 @@ class LiveSAL(nn.Module):
         ):
             for i, decoder_block in enumerate(self.decoder):
                 skip_feat = skip_features[-(i + 1)]
-                if fused_features.shape[-2:] != skip_feat.shape[-2:]:
-                    fused_features = nn.functional.interpolate(
-                        fused_features,
-                        size=skip_feat.shape[-2:],
-                        mode="bilinear",
-                        align_corners=False,
-                    )
+                fused_features = nn.functional.interpolate(
+                    fused_features,
+                    size=skip_feat.shape[-2:],
+                    mode="bilinear",
+                    align_corners=False,
+                )
                 fused_features = torch.cat([fused_features, skip_feat], dim=1)
                 fused_features = decoder_block(fused_features)
             decoded_features_list.append(fused_features)
@@ -765,15 +732,9 @@ class LiveSAL(nn.Module):
             is_image=is_image,
         )
 
-        # Get depth features if needed
-        depth_attention = None
-        if self.with_depth_information:
-            depth_attention = self._get_depth_attention(x, is_image)
-
         # Fuse features
         fused_features = self._get_fused_features(
             image_projected_features_list=image_projected_features_list, 
-            depth_attention=depth_attention,
             is_image=is_image,
         )
 
