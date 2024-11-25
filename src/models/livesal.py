@@ -328,7 +328,6 @@ class LiveSAL(nn.Module):
         self,
         hidden_channels: int,
         temporal_output: bool,
-        with_absolute_positional_embeddings: bool,
         with_relative_positional_embeddings: bool,
         n_heads: int,
         neighbor_radius: int,
@@ -342,7 +341,6 @@ class LiveSAL(nn.Module):
 
         self.hidden_channels = hidden_channels
         self.temporal_output = temporal_output
-        self.with_absolute_positional_embeddings = with_absolute_positional_embeddings
         self.with_relative_positional_embeddings = with_relative_positional_embeddings
         self.n_heads = n_heads
         self.neighbor_radius = neighbor_radius
@@ -414,13 +412,8 @@ class LiveSAL(nn.Module):
             ]
         )
 
-        last_feature_size = self.image_encoder.feature_sizes[-1]
-        if with_absolute_positional_embeddings:
-            self.positional_embeddings = nn.Parameter(
-                torch.randn(1, hidden_channels, last_feature_size, last_feature_size)
-            )
-
         if with_graph_processing:
+            last_feature_size = self.image_encoder.feature_sizes[-1]
             self.graph_processor = GraphProcessor(
                 hidden_channels=hidden_channels,
                 with_relative_positional_embeddings=with_relative_positional_embeddings,
@@ -559,16 +552,6 @@ class LiveSAL(nn.Module):
 
         return image_projected_features_list
     
-    def _add_absolute_positional_embeddings(
-        self, image_features: torch.Tensor
-    ) -> torch.Tensor:
-        batch_size_sequence_length, channels, height, width = image_features.shape
-        image_features = image_features.view(-1, SEQUENCE_LENGTH, channels, height, width)
-        image_features = image_features + self.positional_embeddings
-        image_features = image_features.view(batch_size_sequence_length, channels, height, width)
-
-        return image_features
-
     def _get_graph_features(
         self, image_features: torch.Tensor, graph_processor: GraphProcessor
     ) -> torch.Tensor:
@@ -642,12 +625,6 @@ class LiveSAL(nn.Module):
             image_features_list=image_features_list,
             is_image=is_image,
         )
-
-        # Add absolute positional embeddings if needed
-        if self.with_absolute_positional_embeddings:
-            image_features_list[-1] = self._add_absolute_positional_embeddings(
-                image_features=image_features_list[-1],
-            )
 
         # Process features if needed
         if self.with_graph_processing:

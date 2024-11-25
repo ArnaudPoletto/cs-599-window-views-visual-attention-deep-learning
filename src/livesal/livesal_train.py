@@ -76,7 +76,6 @@ def _get_dataloaders(
 def get_model(
     hidden_channels: int,
     temporal_output: bool,
-    with_absolute_positional_embeddings: bool,
     with_relative_positional_embeddings: bool,
     n_heads: int,
     neighbor_radius: int,
@@ -89,7 +88,6 @@ def get_model(
     return LiveSAL(
         hidden_channels=hidden_channels,
         temporal_output=temporal_output,
-        with_absolute_positional_embeddings=with_absolute_positional_embeddings,
         with_relative_positional_embeddings=with_relative_positional_embeddings,
         n_heads=n_heads,
         neighbor_radius=neighbor_radius,
@@ -189,7 +187,6 @@ def main() -> None:
     with_transforms = bool(config["with_transforms"])
     hidden_channels = int(config["hidden_channels"])
     temporal_output = bool(config["temporal_output"])
-    with_absolute_positional_embeddings = bool(config["with_absolute_positional_embeddings"])
     with_relative_positional_embeddings = bool(config["with_relative_positional_embeddings"])
     n_heads = int(config["n_heads"])
     neighbor_radius = int(config["neighbor_radius"])
@@ -210,7 +207,6 @@ def main() -> None:
     model = get_model(
         hidden_channels=hidden_channels,
         temporal_output=temporal_output,
-        with_absolute_positional_embeddings=with_absolute_positional_embeddings,
         with_relative_positional_embeddings=with_relative_positional_embeddings,
         n_heads=n_heads,
         neighbor_radius=neighbor_radius,
