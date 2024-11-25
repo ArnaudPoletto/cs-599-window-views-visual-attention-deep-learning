@@ -414,13 +414,19 @@ class LiveSAL(nn.Module):
             ]
         )
 
+        last_feature_size = self.image_encoder.feature_sizes[-1]
+        if with_absolute_positional_embeddings:
+            self.positional_embeddings = nn.Parameter(
+                torch.randn(1, hidden_channels, last_feature_size, last_feature_size)
+            )
+
         if with_graph_processing:
             self.graph_processor = GraphProcessor(
                 hidden_channels=hidden_channels,
                 with_relative_positional_embeddings=with_relative_positional_embeddings,
                 n_heads=n_heads,
                 neighbor_radius=neighbor_radius,
-                fusion_size=self.image_encoder.feature_sizes[-1],
+                fusion_size=last_feature_size,
                 n_iterations=n_iterations,
                 dropout_rate=self.dropout_rate,
             )
@@ -552,6 +558,16 @@ class LiveSAL(nn.Module):
             image_projected_features_list.append(image_projected_features)
 
         return image_projected_features_list
+    
+    def _add_absolute_positional_embeddings(
+        self, image_features: torch.Tensor
+    ) -> torch.Tensor:
+        batch_size_sequence_length, channels, height, width = image_features.shape
+        image_features = image_features.view(-1, SEQUENCE_LENGTH, channels, height, width)
+        image_features = image_features + self.positional_embeddings
+        image_features = image_features.view(batch_size_sequence_length, channels, height, width)
+
+        return image_features
 
     def _get_graph_features(
         self, image_features: torch.Tensor, graph_processor: GraphProcessor
@@ -626,6 +642,12 @@ class LiveSAL(nn.Module):
             image_features_list=image_features_list,
             is_image=is_image,
         )
+
+        # Add absolute positional embeddings if needed
+        if self.with_absolute_positional_embeddings:
+            image_features_list[-1] = self._add_absolute_positional_embeddings(
+                image_features=image_features_list[-1],
+            )
 
         # Process features if needed
         if self.with_graph_processing:
