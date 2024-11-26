@@ -25,8 +25,8 @@ class ImageEncoder(nn.Module):
         Initializes the image encoder.
         
         Args:
-            model_name (str): The name of the pretrained model to use.
-            pretrained (bool): Whether to use pretrained weights.
+            pretrained (bool, optional): Whether to use a pretrained model to extract features from the image. Defaults to True.
+            freeze (bool, optional): Whether to freeze the model's parameters. Defaults to True.
         """
         super(ImageEncoder, self).__init__()
 
@@ -34,16 +34,24 @@ class ImageEncoder(nn.Module):
             model_name=MODEL_NAME, pretrained=pretrained, features_only=True
         )
 
-        self.feature_channels = [feature_info["num_chs"] for feature_info in self.pnas.feature_info]
+        self.feature_channels_list = self._get_feature_channels_list()
         self.feature_sizes = self._get_feature_sizes()
 
         if freeze:
             for param in self.pnas.parameters():
                 param.requires_grad = False
 
+    def _get_feature_channels_list(self) -> List[int]:
+        """
+        Returns the number of channels of the features extracted by the model, from lower-level to higher-level features.
+        Example: [96, 270, 1080, 2160, 4320] means that the first lower-level feature has 96 channels, the second 270, and so on.
+        """
+        return [feature_info["num_chs"] for feature_info in self.pnas.feature_info]
+
     def _get_feature_sizes(self) -> List[int]:
         """
-        Returns the sizes of the features extracted by the model.
+        Returns the spatial size of the features extracted by the model, from lower-level to higher-level features.
+        Example: [165, 83, 42, 21, 11] means that the first lower-level feature has a spatial size of 165x165, the second 83x83, and so on.
         
         Returns:
             List[int]: The sizes of the features extracted by the model.

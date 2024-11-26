@@ -18,8 +18,8 @@ class ImageDecoder(nn.Module):
 
     def __init__(
         self,
-        features_channels: List[int],
-        hidden_channels: List[int],
+        features_channels_list: List[int],
+        hidden_channels_list: List[int],
         features_sizes: List[int],
         output_channels: int,
     ) -> None:
@@ -34,39 +34,35 @@ class ImageDecoder(nn.Module):
         """
         super(ImageDecoder, self).__init__()
 
-        self.features_channels = features_channels
-        self.hidden_channels = hidden_channels
+        self.features_channels_list = features_channels_list
+        self.hidden_channels_list = hidden_channels_list
         self.features_sizes = features_sizes
 
-        # The decoder layers
-        in_channels = features_channels[::-1]
-        inc_channels = [0] + hidden_channels[::-1]
-        out_channels = hidden_channels[::-1]
-        sizes = features_sizes[::-1][1:] + [IMAGE_SIZE]
-        self.deconvs = nn.ModuleList(
+        # Get the decoder layers
+        in_channels_list = [features_channels_list[-1]] + hidden_channels_list[1:][::-1]
+        inc_channels_list = [features_channels_list[-2]] + features_channels_list[:-2][::-1]
+        out_channels_list = hidden_channels_list[::-1]
+        self.decoder_layers = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
-                        in_channels=in_c + inc_c,
-                        out_channels=out_c,
+                        in_channels=in_channels + inc_channels,
+                        out_channels=out_channels,
                         kernel_size=3,
                         padding=1,
                         bias=False,
                     ),
-                    nn.BatchNorm2d(num_features=out_c),
+                    nn.BatchNorm2d(num_features=out_channels),
                     nn.ReLU(inplace=True),
-                    nn.Upsample(
-                        size=(size, size), mode="bilinear", align_corners=False
-                    ),
                 )
-                for in_c, inc_c, out_c, size in zip(
-                    in_channels, inc_channels, out_channels, sizes
+                for in_channels, inc_channels, out_channels in zip(
+                    in_channels_list, inc_channels_list, out_channels_list
                 )
             ]
         )
 
-        # The final layer
-        final_channels = out_channels[-1]
+        # Get the final layer
+        final_channels = out_channels_list[-1]
         self.final_layer = nn.Sequential(
             nn.Conv2d(
                 in_channels=final_channels,
@@ -87,7 +83,7 @@ class ImageDecoder(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, features: List[torch.Tensor]) -> torch.Tensor:
+    def forward(self, xs: List[torch.Tensor]) -> torch.Tensor:
         """
         Forward pass of the image decoder.
 
@@ -97,11 +93,15 @@ class ImageDecoder(nn.Module):
         Returns:
             torch.Tensor: The decoded image.
         """
-        for i, (feature, deconv) in enumerate(zip(features[::-1], self.deconvs)):
-            if i > 0:
-                feature = torch.cat((x, feature), 1)
-            x = deconv(feature)
+        x = xs[-1]
+        y = xs[-2]
+        for i, decoder_layer in enumerate(self.decoder_layers):
+            y = xs[-(i + 2)]
+            x = nn.functional.interpolate(x, size=y.shape[-2:], mode='bilinear', align_corners=False)
+            x = torch.cat([x, y], dim=1)
+            x = decoder_layer(x)
 
-        x = self.final_layer(x)
+        output = nn.functional.interpolate(x, size=(IMAGE_SIZE, IMAGE_SIZE), mode='bilinear', align_corners=False)
+        output = self.final_layer(output)
 
-        return x.squeeze(1)
+        return output

@@ -69,7 +69,8 @@ class Trainer(ABC):
         for batch_idx, batch in enumerate(train_loader):
             # Zero the gradients
             optimizer.zero_grad()
-            train_loss, _, _ = self._forward_pass(batch)
+            temporal_train_loss, global_train_loss, _, _, _, _ = self._forward_pass(batch)
+            train_loss = temporal_train_loss + global_train_loss
             total_train_loss += train_loss.item()
             n_train_loss += 1
 
@@ -124,22 +125,29 @@ class Trainer(ABC):
     def _evaluate(self, loader: DataLoader) -> dict[str, float]:
         self.model.eval()
 
-        total_val_loss = 0
         with torch.no_grad():
             metrics = {}
             for batch in loader:
                 # Get loss and metrics
-                val_loss, prediction, target = self._forward_pass(batch)
+                temporal_val_loss, global_val_loss, temporal_output, global_output, temporal_ground_truth, global_ground_truth = self._forward_pass(batch)
 
-                if "loss" not in metrics:
-                    metrics["loss"] = []
-                metrics["loss"].append(val_loss.item())
+                if "temporal_loss" not in metrics:
+                    metrics["temporal_loss"] = []
+                metrics["temporal_loss"].append(temporal_val_loss.item())
+                if "global_loss" not in metrics:
+                    metrics["global_loss"] = []
+                metrics["global_loss"].append(global_val_loss.item())
 
-                new_metrics = Metrics().get_metrics(prediction, target, center_bias_prior=None) # TODO: add center bias prior
-                for key, value in new_metrics.items():
+                new_temporal_metrics = Metrics().get_metrics(temporal_output, temporal_ground_truth, center_bias_prior=None) # TODO: add center bias prior
+                for key, value in new_temporal_metrics.items():
                     if key not in metrics:
-                        metrics[key] = []
-                    metrics[key].append(value)
+                        metrics[f"temporal_{key}"] = []
+                    metrics[f"temporal_{key}"].append(value)
+                new_global_metrics = Metrics().get_metrics(global_output, global_ground_truth, center_bias_prior=None) # TODO: add center bias prior
+                for key, value in new_global_metrics.items():
+                    if key not in metrics:
+                        metrics[f"global_{key}"] = []
+                    metrics[f"global_{key}"].append(value)
 
         # Normalize metrics
         for key, value in metrics.items():

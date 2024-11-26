@@ -9,5 +9,4 @@ save_model: True
 use_scaler: True
 with_transforms: True
 
-temporal_output: False
 freeze_encoder: True

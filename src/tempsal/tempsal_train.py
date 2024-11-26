@@ -29,12 +29,9 @@ from src.config import (
 
 
 def get_model(
-    temporal_output: bool,
     freeze_encoder: bool,
 ) -> nn.Module:
-    return TempSAL(temporal_output=temporal_output, freeze_encoder=freeze_encoder).to(
-        DEVICE
-    )
+    return TempSAL(freeze_encoder=freeze_encoder).to(DEVICE)
 
 
 def get_criterion() -> nn.Module:
@@ -43,8 +40,8 @@ def get_criterion() -> nn.Module:
     mse_loss = MSELoss()
     criterion = CombinedLoss(
         {
-            "kl": (kl_loss, 1.0), # TODO: remove hardocded values
-            "corr": (corr_loss, 1.0), # TODO: remove hardocded values
+            "kl": (kl_loss, 1.0),  # TODO: remove hardocded values
+            "corr": (corr_loss, 1.0),  # TODO: remove hardocded values
             "mse": (mse_loss, 0.0),
         }
     )
@@ -99,32 +96,11 @@ def parse_arguments() -> argparse.Namespace:
         default=f"{CONFIG_PATH}/tempsal/temporal.yml",
         help="The path to the config file.",
     )
-        
+
     return parser.parse_args()
-
-# TODO
-def get_all_gpus():
-    try:
-        result = subprocess.check_output(
-            ['nvidia-smi', '--query-gpu=index,name', '--format=csv,noheader'],
-            encoding='utf-8')
-        gpus = result.strip().split('\n')
-        gpu_info = [gpu.strip() for gpu in gpus]
-        return gpu_info
-    except Exception as e:
-        print(f"Error getting GPU info: {e}")
-        return []
-
-# TODO
-def print_all_gpus():
-    gpu_info = get_all_gpus()
-    print("All GPUs on the node:")
-    for gpu in gpu_info:
-        print(gpu)
 
 
 def main() -> None:
-    print_all_gpus()
     set_seed(SEED)
 
     # Parse arguments
@@ -143,7 +119,6 @@ def main() -> None:
     save_model = bool(config["save_model"])
     use_scaler = bool(config["use_scaler"])
     with_transforms = bool(config["with_transforms"])
-    temporal_output = bool(config["temporal_output"])
     freeze_encoder = bool(config["freeze_encoder"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
@@ -163,7 +138,6 @@ def main() -> None:
         seed=SEED,
     )
     model = get_model(
-        temporal_output=temporal_output,
         freeze_encoder=freeze_encoder,
     )
     criterion = get_criterion()

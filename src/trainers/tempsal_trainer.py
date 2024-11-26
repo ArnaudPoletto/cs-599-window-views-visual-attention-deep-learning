@@ -30,10 +30,8 @@ class TempSALTrainer(Trainer):
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
             "model_name": self.model.__class__.__name__,
-            "output_channels": self.model.output_channels,
-            "temporal_output": self.model.temporal_output,
-            "hidden_channels_list": self.model.hidden_channels_list,
             "freeze_encoder": self.model.freeze_encoder,
+            "hidden_channels_list": self.model.hidden_channels_list,
             
         }
 
@@ -45,20 +43,17 @@ class TempSALTrainer(Trainer):
         return name
 
     def _forward_pass(self, batch: tuple) -> torch.Tensor:
-        frame, ground_truths, global_ground_truth = batch
+        frame, temporal_ground_truth, global_ground_truth = batch
         frame = frame.float().to(DEVICE)
-        ground_truths = ground_truths.float().to(DEVICE)
+        temporal_ground_truth = temporal_ground_truth.float().to(DEVICE)
         global_ground_truth = global_ground_truth.float().to(DEVICE)
 
         # Forward pass
         with autocast(enabled=self.use_scaler):
-            outputs = self.model(frame)
+            temporal_output, global_output = self.model(frame)
 
         # Get loss
-        if self.model.temporal_output:
-            ground_truth = ground_truths
-        else:
-            ground_truth = global_ground_truth
-        loss = self.criterion(outputs, ground_truth)
+        temporal_loss = self.criterion(temporal_output, temporal_ground_truth)
+        global_loss = self.criterion(global_output, global_ground_truth)
 
-        return loss, outputs, ground_truth
+        return temporal_loss, global_loss, temporal_output, global_output, temporal_ground_truth, global_ground_truth
