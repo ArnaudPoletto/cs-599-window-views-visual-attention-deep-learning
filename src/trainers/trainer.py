@@ -130,7 +130,11 @@ class Trainer(ABC):
             for batch in loader:
                 # Get loss and metrics
                 temporal_val_loss, global_val_loss, temporal_output, global_output, temporal_ground_truth, global_ground_truth = self._forward_pass(batch)
+                val_loss = temporal_val_loss + global_val_loss
 
+                if "loss" not in metrics:
+                    metrics["loss"] = []
+                metrics["loss"].append(val_loss.item())
                 if "temporal_loss" not in metrics:
                     metrics["temporal_loss"] = []
                 metrics["temporal_loss"].append(temporal_val_loss.item())

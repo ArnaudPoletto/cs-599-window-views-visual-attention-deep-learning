@@ -12,8 +12,7 @@ with_transforms: True
 
 hidden_channels: 64
 temporal_output: False
-with_absolute_positional_embeddings: True
-with_relative_positional_embeddings: True
+with_relative_positional_embeddings: False
 n_heads: 1
 neighbor_radius: 1
 n_iterations: 3

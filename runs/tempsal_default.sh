@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=livesal
-#SBATCH --output=/scratch/izar/poletto/logs/log_tempsal_global_%j.out
-#SBATCH --error=/scratch/izar/poletto/logs/log_tempsal_global_%j.err
+#SBATCH --output=/scratch/izar/poletto/logs/log_tempsal_default_%j.out
+#SBATCH --error=/scratch/izar/poletto/logs/log_tempsal_default_%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1  # Number of GPUs per node
 #SBATCH --gres=gpu:1         # Adjust based on available GPUs
@@ -17,6 +17,6 @@ source /home/poletto/venvs/pdm/bin/activate
 
 cd /home/poletto/code
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-srun python src/tempsal/tempsal_train.py -c /home/poletto/code/config/tempsal/global.yml
+srun python src/tempsal/tempsal_train.py -c /home/poletto/code/config/tempsal/default.yml
 
 
