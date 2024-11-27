@@ -1,4 +1,4 @@
-dataset: "salicon" # "salicon" | "dhf1k" 
+dataset: "dhf1k" # "salicon" | "dhf1k" 
 n_epochs: 5
 learning_rate: 1e-3
 weight_decay: 1e-6
@@ -11,8 +11,7 @@ use_scaler: True
 with_transforms: True
 
 hidden_channels: 64
-temporal_output: True
-with_relative_positional_embeddings: False
+with_relative_positional_embeddings: True
 n_heads: 1
 neighbor_radius: 1
 n_iterations: 3

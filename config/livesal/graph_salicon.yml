@@ -15,7 +15,7 @@ with_relative_positional_embeddings: True
 n_heads: 1
 neighbor_radius: 1
 n_iterations: 3
-with_graph_processing: True
+with_graph_processing: False
 freeze_encoder: True
 with_depth_information: False
 dropout_rate: 0.0
