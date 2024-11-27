@@ -359,7 +359,7 @@ def main():
 
     # Get gaze file paths for each sample
     gaze_file_paths = get_paths_recursive(
-        folder_path=RAW_SALICON_GAZES_PATH, match_pattern="*.mat", file_type="f"
+        folder_path=RAW_SALICON_GAZES_PATH, match_pattern="*.mat", path_type="f"
     )
 
     # Process fixations

@@ -129,7 +129,7 @@ def main() -> None:
 
     # Get dataloaders, model, criterion, optimizer, and trainer
     sample_folder_paths = get_paths_recursive(
-        folder_path=PROCESSED_SALICON_PATH, match_pattern="*", file_type="d"
+        folder_path=PROCESSED_SALICON_PATH, match_pattern="*", path_type="d"
     )
     train_loader, val_loader, _ = get_dataloaders(
         sample_folder_paths=sample_folder_paths,

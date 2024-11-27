@@ -332,7 +332,7 @@ def main():
 
     # Get video paths
     video_paths = get_paths_recursive(
-        folder_path=SETS_PATH, match_pattern="*.mp4", file_type="f"
+        folder_path=SETS_PATH, match_pattern="*.mp4", path_type="f"
     )
 
     # Get and fixation data

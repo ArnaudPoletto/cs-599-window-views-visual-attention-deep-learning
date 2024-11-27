@@ -44,7 +44,7 @@ def get_gaze_file_paths_dict() -> Dict[int, List[str]]:
     gaze_file_paths = get_paths_recursive(
         folder_path=RAW_EXPORTDATA_DHF1K_PATH,
         match_pattern="*.txt",
-        file_type="f",
+        path_type="f",
     )
     gaze_file_paths_dict = {}
     for gaze_file_path in gaze_file_paths:

@@ -53,7 +53,7 @@ def _get_dataloaders(
         )
     elif dataset == "dhf1k":
         sample_folder_paths = get_paths_recursive(
-            folder_path=PROCESSED_DHF1K_PATH, match_pattern="*", file_type="d"
+            folder_path=PROCESSED_DHF1K_PATH, match_pattern="*", path_type="d"
         )
         loaders = get_dhf1k_dataloaders(
             sample_folder_paths=sample_folder_paths,

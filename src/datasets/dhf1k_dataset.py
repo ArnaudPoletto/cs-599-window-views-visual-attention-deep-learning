@@ -58,12 +58,12 @@ class DHF1KDataset(Dataset):
             frames_folder_path = f"{sample_folder_path}/frames"
             ground_truths_folder_path = f"{sample_folder_path}/ground_truths"
             frames = get_paths_recursive(
-                folder_path=frames_folder_path, match_pattern="*_1.jpg", file_type="f"
+                folder_path=frames_folder_path, match_pattern="*_1.jpg", path_type="f"
             )  # TODO: Only first frame for now
             ground_truths = get_paths_recursive(
                 folder_path=ground_truths_folder_path,
                 match_pattern="ground_truth_*.jpg",
-                file_type="f",
+                path_type="f",
             )
 
             # Remove any frames that do not have corresponding ground truth files. This mismatch 
