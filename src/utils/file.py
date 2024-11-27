@@ -13,7 +13,7 @@ from src.config import SAMPLES_PATH
 def get_paths_recursive(
     folder_path: str,
     match_pattern: str,
-    file_type: str = None,
+    path_type: str = None,
     recursive: bool = True,
 ) -> List[str]:
     """
@@ -28,9 +28,9 @@ def get_paths_recursive(
     Returns:
         List[str]: List of file paths that match the given pattern
     """
-    if file_type not in [None, "f", "d"]:
+    if path_type not in [None, "f", "d"]:
         raise ValueError(
-            f"❌ Invalid file type {file_type}. Must be None, 'f', or 'd'."
+            f"❌ Invalid file type {path_type}. Must be None, 'f', or 'd'."
         )
 
     # Define search method and get paths
@@ -42,9 +42,9 @@ def get_paths_recursive(
         path.resolve().as_posix()
         for path in paths
         if (
-            file_type is None
-            or (file_type == "f" and path.is_file())
-            or (file_type == "d" and path.is_dir())
+            path_type is None
+            or (path_type == "f" and path.is_file())
+            or (path_type == "d" and path.is_dir())
         )
     ]
 

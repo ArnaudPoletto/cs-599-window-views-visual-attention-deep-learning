@@ -10,6 +10,7 @@ import wandb
 import torch
 import numpy as np
 from torch import nn
+from PIL import Image
 from tqdm import tqdm
 from typing import Tuple
 from torch.optim import Optimizer
@@ -18,7 +19,7 @@ from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader
 
 from src.metrics.metrics import Metrics
-from src.config import MODELS_PATH
+from src.config import MODELS_PATH, SALICON_PATH, DEVICE
 
 
 class Trainer(ABC):
@@ -30,6 +31,7 @@ class Trainer(ABC):
         evaluation_steps: int,
         use_scaler: bool,
         name: str,
+        dataset: str,
     ) -> None:
         super(Trainer, self).__init__()
 
@@ -39,6 +41,7 @@ class Trainer(ABC):
         self.evaluation_steps = evaluation_steps
         self.use_scaler = use_scaler
         self.name = name
+        self.dataset = dataset
 
         self.best_eval_val_loss = np.inf
         self.eval_train_loss = 0
@@ -142,12 +145,19 @@ class Trainer(ABC):
                     metrics["global_loss"] = []
                 metrics["global_loss"].append(global_val_loss.item())
 
-                new_temporal_metrics = Metrics().get_metrics(temporal_output, temporal_ground_truth, center_bias_prior=None) # TODO: add center bias prior
+                # Get center bias dataset for metrics
+                if self.dataset == "salicon":
+                    center_bias_path = f"{SALICON_PATH}/center_bias.jpg"
+                    center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(DEVICE)
+                else:
+                    center_bias = None
+
+                new_temporal_metrics = Metrics().get_metrics(temporal_output, temporal_ground_truth, center_bias_prior=center_bias)
                 for key, value in new_temporal_metrics.items():
                     if key not in metrics:
                         metrics[f"temporal_{key}"] = []
                     metrics[f"temporal_{key}"].append(value)
-                new_global_metrics = Metrics().get_metrics(global_output, global_ground_truth, center_bias_prior=None) # TODO: add center bias prior
+                new_global_metrics = Metrics().get_metrics(global_output, global_ground_truth, center_bias_prior=center_bias)
                 for key, value in new_global_metrics.items():
                     if key not in metrics:
                         metrics[f"global_{key}"] = []
@@ -190,6 +200,8 @@ class Trainer(ABC):
         wandb_config = self._get_wandb_config()
         wandb_config.update(
             {
+                "model_name": self.model.__class__.__name__,
+                "dataset": self.dataset,
                 "n_epochs": n_epochs,
                 "learning_rate": learning_rate,
             }

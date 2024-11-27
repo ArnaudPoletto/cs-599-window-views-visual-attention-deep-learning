@@ -38,7 +38,7 @@ def _get_dataloaders(
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     if dataset == "salicon":
         sample_folder_paths = get_paths_recursive(
-            folder_path=PROCESSED_SALICON_PATH, match_pattern="*", file_type="d"
+            folder_path=PROCESSED_SALICON_PATH, match_pattern="*", path_type="d"
         )
         loaders = get_salicon_dataloaders(
             sample_folder_paths=sample_folder_paths,
@@ -130,6 +130,7 @@ def get_trainer(
     accumulation_steps: int,
     evaluation_steps: int,
     use_scaler: bool,
+    dataset: str,
 ) -> LiveSALTrainer:
     return LiveSALTrainer(
         model=model,
@@ -138,6 +139,7 @@ def get_trainer(
         evaluation_steps=evaluation_steps,
         use_scaler=use_scaler,
         name=f"livesal",
+        dataset=dataset,
     )
 
 
@@ -224,6 +226,7 @@ def main() -> None:
         accumulation_steps=accumulation_steps,
         evaluation_steps=evaluation_steps,
         use_scaler=use_scaler,
+        dataset=dataset,
     )
 
     # Train the model

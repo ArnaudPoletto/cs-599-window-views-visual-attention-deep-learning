@@ -100,6 +100,9 @@ class Metrics():
     ) -> torch.Tensor:
         """Calculate Information Gain relative to center bias prior."""
         pred, target = self._reshape_4d(pred, target)
+        
+        center_bias_prior = center_bias_prior.unsqueeze(0).unsqueeze(0)
+        center_bias_prior = F.interpolate(center_bias_prior, size=pred.shape[-2:], mode='bilinear', align_corners=False)
 
         # Normalize predictions and center bias prior
         pred = self._normalize_map(pred)

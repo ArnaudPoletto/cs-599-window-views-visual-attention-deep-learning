@@ -17,6 +17,7 @@ class ViDaSTrainer(Trainer):
         evaluation_steps: int,
         use_scaler: bool,
         name: str,
+        dataset: str,
     ) -> None:
         super(ViDaSTrainer, self).__init__(
             model=model,
@@ -25,11 +26,11 @@ class ViDaSTrainer(Trainer):
             evaluation_steps=evaluation_steps,
             use_scaler=use_scaler,
             name=name,
+            dataset=dataset,
         )
 
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
-            "model_name": self.model.__class__.__name__,
             "input_channels": self.model.input_channels,
             "output_channels": self.model.output_channels,
             "input_shape": self.model.input_shape,

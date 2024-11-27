@@ -81,7 +81,7 @@ class SaliconDataset(Dataset):
         sample_folder_path = self.sample_folder_paths[index]
         frame_file_path = f"{sample_folder_path}/frame.jpg"
         output_file_paths = get_paths_recursive(
-            sample_folder_path, match_pattern="ground_truth_*.jpg", file_type="f"
+            sample_folder_path, match_pattern="ground_truth_*.jpg", path_type="f"
         )
         frame = np.array(Image.open(frame_file_path).convert("RGB"))
         ground_truths = np.array(

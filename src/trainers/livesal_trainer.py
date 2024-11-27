@@ -17,6 +17,7 @@ class LiveSALTrainer(Trainer):
         evaluation_steps: int,
         use_scaler: bool,
         name: str,
+        dataset: str,
     ) -> None:
         super(LiveSALTrainer, self).__init__(
             model=model,
@@ -25,11 +26,11 @@ class LiveSALTrainer(Trainer):
             evaluation_steps=evaluation_steps,
             use_scaler=use_scaler,
             name=name,
+            dataset=dataset,
         )
 
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
-            "model_name": self.model.__class__.__name__,
             "hidden_channels": self.model.hidden_channels,
             "with_relative_positional_embeddings": self.model.with_relative_positional_embeddings,
             "n_heads": self.model.n_heads,

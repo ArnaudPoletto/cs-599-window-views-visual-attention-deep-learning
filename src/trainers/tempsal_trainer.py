@@ -25,11 +25,11 @@ class TempSALTrainer(Trainer):
             evaluation_steps=evaluation_steps,
             use_scaler=use_scaler,
             name=name,
+            dataset="salicon",
         )
 
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
-            "model_name": self.model.__class__.__name__,
             "freeze_encoder": self.model.freeze_encoder,
             "hidden_channels_list": self.model.hidden_channels_list,
             
