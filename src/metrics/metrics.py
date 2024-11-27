@@ -29,15 +29,15 @@ class Metrics():
         target = target.view(target.size(0), -1)
 
         # Apply softmax to both predictions and targets
-        target_soft = F.softmax(target, dim=1)
-        pred_log_soft = F.log_softmax(pred, dim=1)
+        pred = torch.log_softmax(pred, dim=1)
+        target = F.log_softmax(target, dim=1)
 
         # Calculate KL divergence
         kl = F.kl_div(
-            pred_log_soft, 
-            target_soft, 
+            pred, 
+            target, 
             reduction='batchmean', 
-            log_target=False
+            log_target=True
         )
 
         return kl
