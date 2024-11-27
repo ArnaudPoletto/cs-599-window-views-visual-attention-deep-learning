@@ -71,18 +71,18 @@ class TempSAL(nn.Module):
             torch.Tensor: The temporal and global saliency maps.
         """
         # Encode the input image
-        encoded_features = self.image_encoder(x)
+        encoded_features_list = self.image_encoder(x)
 
         # Decode the temporal and global features
-        temporal_features = self.temporal_decoder(encoded_features)
-        global_features = self.global_decoder(encoded_features)
+        temporal_features = self.temporal_decoder(encoded_features_list)
+        global_features = self.global_decoder(encoded_features_list)
 
         # The temporal output is the temporal features
         temporal_output = temporal_features
 
         # The global output is the output of the spatio-temporal mixing module
         global_output = self.spatio_temporal_mixing_module(
-            encoded_features=encoded_features,
+            encoded_features_list=encoded_features_list,
             temporal_features=temporal_features,
             global_features=global_features,
         ).squeeze(1)
