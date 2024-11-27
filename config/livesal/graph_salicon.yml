@@ -12,7 +12,6 @@ with_transforms: True
 
 hidden_channels: 64
 with_relative_positional_embeddings: True
-n_heads: 1
 neighbor_radius: 1
 n_iterations: 3
 with_graph_processing: True

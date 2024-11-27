@@ -33,7 +33,6 @@ class LiveSALTrainer(Trainer):
         return {
             "hidden_channels": self.model.hidden_channels,
             "with_relative_positional_embeddings": self.model.with_relative_positional_embeddings,
-            "n_heads": self.model.n_heads,
             "neighbor_radius": self.model.neighbor_radius,
             "n_iterations": self.model.n_iterations,
             "with_graph_processing": self.model.with_graph_processing,

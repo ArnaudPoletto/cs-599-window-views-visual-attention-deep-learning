@@ -11,9 +11,7 @@ class GraphProcessor(nn.Module):
     def __init__(
         self,
         hidden_channels: int,
-        with_relative_positional_embeddings: bool,
         fusion_size: int,
-        n_heads: int,
         neighbor_radius: int,
         n_iterations: int,
         dropout_rate: float,
@@ -23,35 +21,24 @@ class GraphProcessor(nn.Module):
         
         Args:
             hidden_channels (int): The number of hidden channels.
-            with_relative_positional_embeddings (bool): Whether to use relative positional embeddings.
             fusion_size (int): The size of the fusion.
-            n_heads (int): The number of heads.
             neighbor_radius (int): The neighbor radius.
             n_iterations (int): The number of iterations.
             dropout_rate (float): The dropout rate.
         """
         super(GraphProcessor, self).__init__()
 
-        if hidden_channels % n_heads != 0:
-            raise ValueError(
-                f"❌ Hidden channels must be divisible by the number of heads, got {hidden_channels} and {n_heads}."
-            )
-
         self.hidden_channels = hidden_channels
-        self.with_relative_positional_embeddings = with_relative_positional_embeddings
         self.fusion_size = fusion_size
-        self.n_heads = n_heads
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
         self.dropout_rate = dropout_rate
-        self.head_dim = hidden_channels // n_heads
         self.scale = hidden_channels**-0.5
 
         self.spatial_dropout = nn.Dropout2d(dropout_rate)
         self.temporal_dropout = nn.Dropout3d(dropout_rate)
 
         # Get intra-attention components
-        self.intra_norm = nn.LayerNorm([hidden_channels, fusion_size, fusion_size])
         self.intra_key_conv = nn.Conv2d(
             in_channels=hidden_channels,
             out_channels=hidden_channels,
@@ -84,16 +71,11 @@ class GraphProcessor(nn.Module):
             nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
             nn.ReLU(inplace=True),
         )
-        self.intra_alpha = nn.Parameter(torch.tensor(1.0))
+        self.intra_alpha = nn.Parameter(torch.tensor(0.5))
 
         # Get inter-attention components
-        self.inter_norm = nn.LayerNorm([hidden_channels, fusion_size, fusion_size])
-        if with_relative_positional_embeddings:
-            self.relative_positional_embeddings = nn.Parameter(
-                torch.randn(2 * neighbor_radius, 1, fusion_size, fusion_size)
-            )
         inter_message_edge_in_channels = (
-            hidden_channels + 2 + (1 * with_relative_positional_embeddings)
+            hidden_channels# + 2
         )
         self.inter_message_edge_conv = nn.Conv2d(
             in_channels=inter_message_edge_in_channels,
@@ -156,9 +138,6 @@ class GraphProcessor(nn.Module):
             kernel_size=3,
             padding=1,
         )
-        self.norm = nn.LayerNorm(
-            [hidden_channels, fusion_size, fusion_size]
-        )
 
     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -171,7 +150,6 @@ class GraphProcessor(nn.Module):
             torch.Tensor: The output tensor.
         """
         batch_size, channels, height, width = x.shape
-        x = self.intra_norm(x)
 
         query = self.intra_query_conv(x).view(batch_size, channels, -1)
         key = self.intra_key_conv(x).view(batch_size, channels, -1)
@@ -187,25 +165,25 @@ class GraphProcessor(nn.Module):
 
         return output
 
-    def _get_temporal_encoding(
-        self, relative_position: int, is_future: bool, device: torch.device
-    ) -> torch.Tensor:
-        """
-        Get the temporal encoding.
+    # def _get_temporal_encoding(
+    #     self, relative_position: int, is_future: bool, device: torch.device
+    # ) -> torch.Tensor:
+    #     """
+    #     Get the temporal encoding.
         
-        Args:
-            relative_position (int): The relative position.
-            is_future (bool): Whether the position is in the future.
-            device (torch.device): The device.
+    #     Args:
+    #         relative_position (int): The relative position.
+    #         is_future (bool): Whether the position is in the future.
+    #         device (torch.device): The device.
             
-        Returns:
-            torch.Tensor: The temporal encoding.
-        """
-        direction = torch.tensor(1.0 if is_future else -1.0, device=device)
-        distance = torch.tensor(float(abs(relative_position)), device=device)
-        temporal_information = torch.stack([direction, distance])
+    #     Returns:
+    #         torch.Tensor: The temporal encoding.
+    #     """
+    #     direction = torch.tensor(1.0 if is_future else -1.0, device=device)
+    #     distance = torch.tensor(float(abs(relative_position)), device=device)
+    #     temporal_information = torch.stack([direction, distance])
 
-        return temporal_information
+    #     return temporal_information
 
     def _compute_inter_attention(
         self, i: int, x: torch.Tensor, neighbors: List[Tuple[int, torch.Tensor]]
@@ -219,7 +197,6 @@ class GraphProcessor(nn.Module):
             neighbors (List[Tuple[int, torch.Tensor]]): The neighbors.
         """
         batch_size, channels, height, width = x.shape
-        x = self.inter_norm(x)
 
         messages = []
         gates = []
@@ -228,37 +205,24 @@ class GraphProcessor(nn.Module):
             is_future = i < j
 
             # Add temporal encoding
-            relative_position = (i - j) / self.neighbor_radius
-            temporal_encoding = self._get_temporal_encoding(
-                relative_position, is_future, x.device
-            )
-            temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(
-                batch_size, -1, height, width
-            )
-            y = torch.cat([y, temporal_encoding], dim=1)
-
-            # Add relative positional embeddings
-            if self.with_relative_positional_embeddings:
-                spatial_encoding = self.relative_positional_embeddings[index].expand(
-                    batch_size, -1, -1, -1
-                )
-                y = torch.cat([y, spatial_encoding], dim=1)
+            #relative_position = (i - j) / self.neighbor_radius
+            #temporal_encoding = self._get_temporal_encoding(
+            #    relative_position, is_future, x.device
+            #)
+            #temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(
+            #    batch_size, -1, height, width
+            #)
+            #y = torch.cat([y, temporal_encoding], dim=1)
             y = self.inter_message_edge_conv(y)
 
-            query = self.inter_query_conv(x).view(
-                batch_size, self.n_heads, self.head_dim, -1
-            )
-            key = self.inter_key_conv(y).view(
-                batch_size, self.n_heads, self.head_dim, -1
-            )
-            value = self.inter_value_conv(y).view(
-                batch_size, self.n_heads, self.head_dim, -1
-            )
+            query = self.inter_query_conv(x).view(batch_size, channels, -1)
+            key = self.inter_key_conv(y).view(batch_size, channels, -1)
+            value = self.inter_value_conv(y).view(batch_size, channels, -1)
 
-            attention = torch.matmul(query.transpose(2, 3), key) * self.scale
+            attention = torch.bmm(query.transpose(1, 2), key) * self.scale
             attention = torch.softmax(attention, dim=-1)
 
-            message = torch.matmul(value, attention.transpose(2, 3))
+            message = torch.bmm(attention, value.transpose(1, 2)).transpose(1, 2)
             message = message.view(batch_size, channels, height, width)
             message = self.inter_output(message)
             gate = self.inter_gate_conv(torch.cat([x, message], dim=1))
@@ -316,7 +280,6 @@ class GraphProcessor(nn.Module):
 
                 next_h = self.gru(combined_message, hi)
                 next_h = next_h + hi
-                next_h = self.norm(next_h)
                 new_h.append(next_h)
 
             h = torch.stack(new_h, dim=0)

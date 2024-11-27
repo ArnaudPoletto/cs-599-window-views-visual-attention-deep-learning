@@ -76,7 +76,6 @@ def _get_dataloaders(
 def get_model(
     hidden_channels: int,
     with_relative_positional_embeddings: bool,
-    n_heads: int,
     neighbor_radius: int,
     n_iterations: int,
     with_graph_processing: bool,
@@ -87,7 +86,6 @@ def get_model(
     return LiveSAL(
         hidden_channels=hidden_channels,
         with_relative_positional_embeddings=with_relative_positional_embeddings,
-        n_heads=n_heads,
         neighbor_radius=neighbor_radius,
         n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,
@@ -187,7 +185,6 @@ def main() -> None:
     with_transforms = bool(config["with_transforms"])
     hidden_channels = int(config["hidden_channels"])
     with_relative_positional_embeddings = bool(config["with_relative_positional_embeddings"])
-    n_heads = int(config["n_heads"])
     neighbor_radius = int(config["neighbor_radius"])
     n_iterations = int(config["n_iterations"])
     with_graph_processing = bool(config["with_graph_processing"])
@@ -206,7 +203,6 @@ def main() -> None:
     model = get_model(
         hidden_channels=hidden_channels,
         with_relative_positional_embeddings=with_relative_positional_embeddings,
-        n_heads=n_heads,
         neighbor_radius=neighbor_radius,
         n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,

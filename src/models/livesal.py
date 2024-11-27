@@ -14,7 +14,6 @@ class LiveSAL(nn.Module):
         self,
         hidden_channels: int,
         with_relative_positional_embeddings: bool,
-        n_heads: int,
         neighbor_radius: int,
         n_iterations: int,
         with_graph_processing: bool,
@@ -26,7 +25,6 @@ class LiveSAL(nn.Module):
 
         self.hidden_channels = hidden_channels
         self.with_relative_positional_embeddings = with_relative_positional_embeddings
-        self.n_heads = n_heads
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
         self.with_graph_processing = with_graph_processing
@@ -98,7 +96,6 @@ class LiveSAL(nn.Module):
             self.graph_processor = GraphProcessor(
                 hidden_channels=hidden_channels,
                 with_relative_positional_embeddings=with_relative_positional_embeddings,
-                n_heads=n_heads,
                 neighbor_radius=neighbor_radius,
                 fusion_size=last_feature_size,
                 n_iterations=n_iterations,
@@ -126,7 +123,8 @@ class LiveSAL(nn.Module):
                         bias=False,
                     ),
                     nn.BatchNorm2d(hidden_channels),
-                    nn.Sigmoid()
+                    nn.ReLU(inplace=True),
+                    nn.Dropout2d(dropout_rate),
                 )
                 for _ in range(self.fusion_level - 1)
             ]
@@ -148,7 +146,6 @@ class LiveSAL(nn.Module):
                 padding=1,
                 bias=True,
             ),
-            nn.Sigmoid(),
         )
 
         self.final_global_layer = nn.Sequential(
@@ -171,15 +168,13 @@ class LiveSAL(nn.Module):
             nn.Sigmoid(),
         )
 
+        self.sigmoid = nn.Sigmoid()
+
     def _normalize_input(
         self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
     ) -> torch.Tensor:
         x = x.clone()
-
-        if x.max() > 1.0:
-            x = x / 255.0
-
-        normalized_x = (x - mean) / std
+        normalized_x = ((x / 255.0) - mean) / std
 
         return normalized_x
 
@@ -304,12 +299,13 @@ class LiveSAL(nn.Module):
             )
 
         # Get temporal output
-        temporal_output = self._get_temporal_output(
+        temporal_features = self._get_temporal_features(
             image_features_list=image_features_list,
         )
+        temporal_output = self.sigmoid(temporal_features)
 
         global_output = self._get_global_output(
-            temporal_output=temporal_output,
+            temporal_features=temporal_features,
         )
 
         return temporal_output, global_output
