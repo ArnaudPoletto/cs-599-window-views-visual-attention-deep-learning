@@ -232,7 +232,7 @@ class LiveSAL(nn.Module):
 
         return graph_features
 
-    def _get_temporal_output(
+    def _get_temporal_features(
         self,
         image_features_list: List[torch.Tensor],
     ) -> torch.Tensor:
@@ -255,9 +255,9 @@ class LiveSAL(nn.Module):
 
         # Get temporal output from decoded features
         batch_size_sequence_length, height, width = decoded_features.shape
-        temporal_output = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
+        temporal_features = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
 
-        return temporal_output
+        return temporal_features
 
     def _get_global_output(
         self,
