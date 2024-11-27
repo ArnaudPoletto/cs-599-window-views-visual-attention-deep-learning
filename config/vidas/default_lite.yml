@@ -10,11 +10,10 @@ use_scaler: True
 with_transforms: True
 
 input_channels: 3
-output_channels: 1
 input_shape: [5, 331, 331]
 hidden_channels_list: [64, 128, 256, 512]
 kernel_sizes: [5, 3, 3, 3]
 use_max_poolings: [False, True, False, False]
 saliency_out_channels: 64
 attention_out_channels: 16
-with_depth_information: True
+with_depth_information: False
