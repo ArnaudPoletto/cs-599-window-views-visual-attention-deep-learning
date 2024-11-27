@@ -10,3 +10,4 @@ use_scaler: True
 with_transforms: True
 
 freeze_encoder: True
+hidden_channels_list: [96, 270, 256, 512]

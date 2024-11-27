@@ -1,333 +1,18 @@
-import math
 import torch
 from torch import nn
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 from src.models.image_encoder import ImageEncoder
 from src.models.depth_estimator import DepthEstimator
-from src.config import SEQUENCE_LENGTH
-
-
-class ConvGRU(nn.Module):
-    def __init__(
-        self, input_channels: int, hidden_channels: int, kernel_size: int, padding: int
-    ):
-        super(ConvGRU, self).__init__()
-
-        self.input_channels = input_channels
-        self.hidden_channels = hidden_channels
-        self.kernel_size = kernel_size
-        self.padding = padding
-
-        # Reset gate
-        self.conv_zr = nn.Conv2d(
-            in_channels=input_channels + hidden_channels,
-            out_channels=2 * hidden_channels,
-            kernel_size=kernel_size,
-            padding=padding,
-            bias=True,
-        )
-
-        # Update gate
-        self.conv_h = nn.Conv2d(
-            in_channels=input_channels + hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=kernel_size,
-            padding=padding,
-            bias=True,
-        )
-
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
-        combined = torch.cat([x, h], dim=1)
-
-        # Compute reset and update gates
-        zr = self.sigmoid(self.conv_zr(combined))
-        z, r = torch.split(zr, self.hidden_channels, dim=1)
-
-        # Compute candidate hidden state
-        combined_r = torch.cat([x, r * h], dim=1)
-        h_hat = torch.tanh(self.conv_h(combined_r))
-
-        # Update hidden state
-        h_new = (1 - z) * h + z * h_hat
-
-        return h_new
-
-
-class GraphProcessor(nn.Module):
-    def __init__(
-        self,
-        hidden_channels: int,
-        with_relative_positional_embeddings: bool,
-        fusion_size: int,
-        n_heads: int,
-        neighbor_radius: int,
-        n_iterations: int,
-        dropout_rate: float,
-    ):
-        super(GraphProcessor, self).__init__()
-
-        if hidden_channels % n_heads != 0:
-            raise ValueError(
-                f"❌ Hidden channels must be divisible by the number of heads, got {hidden_channels} and {n_heads}."
-            )
-
-        self.hidden_channels = hidden_channels
-        self.with_relative_positional_embeddings = with_relative_positional_embeddings
-        self.fusion_size = fusion_size
-        self.n_heads = n_heads
-        self.neighbor_radius = neighbor_radius
-        self.n_iterations = n_iterations
-        self.dropout_rate = dropout_rate
-        self.head_dim = hidden_channels // n_heads
-        self.scale = hidden_channels**-0.5
-
-        self.spatial_dropout = nn.Dropout2d(dropout_rate)
-        self.temporal_dropout = nn.Dropout3d(dropout_rate)
-
-        self.intra_norm = nn.LayerNorm([hidden_channels, fusion_size, fusion_size])
-        self.intra_key_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.intra_query_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.intra_value_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.intra_output = nn.Sequential(
-            nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
-                kernel_size=3,
-                padding=1,
-                bias=True,
-            ),
-            nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
-            nn.ReLU(inplace=True),
-        )
-        self.intra_alpha = nn.Parameter(torch.tensor(1.0))
-
-        self.inter_norm = nn.LayerNorm([hidden_channels, fusion_size, fusion_size])
-        if with_relative_positional_embeddings:
-            self.relative_positional_embeddings = nn.Parameter(
-                torch.randn(2 * neighbor_radius, 1, fusion_size, fusion_size)
-            )
-        inter_message_edge_in_channels = (
-            hidden_channels + 2 + (1 * with_relative_positional_embeddings)
-        )
-        self.inter_message_edge_conv = nn.Conv2d(
-            in_channels=inter_message_edge_in_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.inter_query_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.inter_key_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.inter_value_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.inter_gate_conv = nn.Sequential(
-            nn.Conv2d(
-                in_channels=hidden_channels * 2,
-                out_channels=hidden_channels,
-                kernel_size=1,
-                padding=0,
-                bias=True,
-            ),
-            nn.AdaptiveAvgPool2d(1),
-            nn.Dropout(dropout_rate),
-            nn.Sigmoid(),
-        )
-        self.inter_output = nn.Sequential(
-            nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
-                kernel_size=3,
-                padding=1,
-                bias=True,
-            ),
-            nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout_rate),
-        )
-
-        self.intra_inter_alpha = nn.Parameter(torch.tensor(0.5))
-
-        self.gru = ConvGRU(
-            input_channels=hidden_channels,
-            hidden_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-        )
-
-        self.norm = nn.LayerNorm(
-            [hidden_channels, fusion_size, fusion_size]
-        )
-
-    def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
-        batch_size, channels, height, width = x.shape
-        x = self.intra_norm(x)
-
-        query = self.intra_query_conv(x).view(batch_size, channels, -1)
-        key = self.intra_key_conv(x).view(batch_size, channels, -1)
-        value = self.intra_value_conv(x).view(batch_size, channels, -1)
-
-        attention = torch.bmm(query.transpose(1, 2), key) * self.scale
-        attention = torch.softmax(attention, dim=-1)
-
-        output = torch.bmm(attention, value.transpose(1, 2))
-        output = output.transpose(1, 2).view(batch_size, channels, height, width)
-        output = self.intra_output(output)
-        output = self.intra_alpha * output + x
-
-        return output
-
-    def _get_temporal_encoding(
-        self, relative_position: int, is_future: bool, device: torch.device
-    ) -> torch.Tensor:
-        direction = torch.tensor(1.0 if is_future else -1.0, device=device)
-        distance = torch.tensor(float(abs(relative_position)), device=device)
-        temporal_information = torch.stack([direction, distance])
-
-        return temporal_information
-
-    def _compute_inter_attention(
-        self, i: int, x: torch.Tensor, neighbors: List[Tuple[int, torch.Tensor]]
-    ) -> torch.Tensor:
-        batch_size, channels, height, width = x.shape
-        x = self.inter_norm(x)
-
-        messages = []
-        gates = []
-        for j, y in neighbors:
-            index = i - j + self.neighbor_radius - 1
-            is_future = i < j
-
-            # Add temporal encoding
-            relative_position = (i - j) / self.neighbor_radius
-            temporal_encoding = self._get_temporal_encoding(
-                relative_position, is_future, x.device
-            )
-            temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(
-                batch_size, -1, height, width
-            )
-            y = torch.cat([y, temporal_encoding], dim=1)
-
-            # Add relative positional embeddings
-            if self.with_relative_positional_embeddings:
-                spatial_encoding = self.relative_positional_embeddings[index].expand(
-                    batch_size, -1, -1, -1
-                )
-                y = torch.cat([y, spatial_encoding], dim=1)
-            y = self.inter_message_edge_conv(y)
-
-            query = self.inter_query_conv(x).view(
-                batch_size, self.n_heads, self.head_dim, -1
-            )
-            key = self.inter_key_conv(y).view(
-                batch_size, self.n_heads, self.head_dim, -1
-            )
-            value = self.inter_value_conv(y).view(
-                batch_size, self.n_heads, self.head_dim, -1
-            )
-
-            attention = torch.matmul(query.transpose(2, 3), key) * self.scale
-            attention = torch.softmax(attention, dim=-1)
-
-            message = torch.matmul(value, attention.transpose(2, 3))
-            message = message.view(batch_size, channels, height, width)
-            message = self.inter_output(message)
-            gate = self.inter_gate_conv(torch.cat([x, message], dim=1))
-
-            messages.append(message)
-            gates.append(gate)
-
-        if messages:
-            messages = torch.stack(messages, dim=0)
-            gates = torch.stack(gates, dim=0)
-            gated_messages = messages * gates
-            output = torch.sum(gated_messages, dim=0)
-        else:
-            output = torch.zeros_like(x)
-
-        return output
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        sequence_length, batch_size, channels, height, width = x.shape
-        h = x
-
-        if self.training:
-            h = h.transpose(1, 2).contiguous()
-            h = self.temporal_dropout(h)
-            h = h.transpose(1, 2).contiguous()
-
-        for _ in range(self.n_iterations):
-            new_h = []
-            for i in range(sequence_length):
-                hi = h[i]
-                if self.training:
-                    hi = self.spatial_dropout(hi)
-
-                intra_output = self._compute_intra_attention(hi)
-
-                neighbors = [
-                    (j, h[j])
-                    for j in range(sequence_length)
-                    if i != j and abs(i - j) <= self.neighbor_radius
-                ]
-                inter_output = self._compute_inter_attention(i, hi, neighbors)
-                combined_message = (
-                    self.intra_inter_alpha * intra_output
-                    + (1 - self.intra_inter_alpha) * inter_output
-                )
-
-                next_h = self.gru(combined_message, hi)
-                next_h = next_h + hi
-                next_h = self.norm(next_h)
-                new_h.append(next_h)
-
-            h = torch.stack(new_h, dim=0)
-
-        return h
+from src.models.graph_processor import GraphProcessor
+from src.models.spatio_temporal_mixing_module import SpatioTemporalMixingModule
+from src.config import SEQUENCE_LENGTH, IMAGE_SIZE
 
 
 class LiveSAL(nn.Module):
     def __init__(
         self,
         hidden_channels: int,
-        temporal_output: bool,
         with_relative_positional_embeddings: bool,
         n_heads: int,
         neighbor_radius: int,
@@ -340,7 +25,6 @@ class LiveSAL(nn.Module):
         super(LiveSAL, self).__init__()
 
         self.hidden_channels = hidden_channels
-        self.temporal_output = temporal_output
         self.with_relative_positional_embeddings = with_relative_positional_embeddings
         self.n_heads = n_heads
         self.neighbor_radius = neighbor_radius
@@ -350,7 +34,7 @@ class LiveSAL(nn.Module):
         self.with_depth_information = with_depth_information
         self.dropout_rate = dropout_rate
 
-        # Get normalization parameters for inputs entering encoders or estimators
+        # Get normalization parameters for encoder/estimator inputs
         self.register_buffer(
             "image_mean",
             torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
@@ -373,11 +57,9 @@ class LiveSAL(nn.Module):
                 persistent=False,
             )
 
-        # Get encoder
         self.image_encoder = ImageEncoder(
             freeze=freeze_encoder,
         )
-        # The fusion level is the depth of the encoder, starting at 1 at the first downsampled level
         self.fusion_level = len(self.image_encoder.feature_sizes)
 
         if with_depth_information:
@@ -385,7 +67,6 @@ class LiveSAL(nn.Module):
                 freeze=freeze_encoder,
             )
 
-        # Projection layers to project encoded features to a common space
         self.image_projection_layers = nn.ModuleList(
             [
                 nn.Sequential(
@@ -408,7 +89,7 @@ class LiveSAL(nn.Module):
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
                 )
-                for in_ch in self.image_encoder.feature_channels
+                for in_ch in self.image_encoder.feature_channels_list
             ]
         )
 
@@ -424,8 +105,7 @@ class LiveSAL(nn.Module):
                 dropout_rate=self.dropout_rate,
             )
 
-        # Decoder layers
-        self.decoder_layers = nn.ModuleList(
+        self.temporal_layers = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
@@ -446,64 +126,50 @@ class LiveSAL(nn.Module):
                         bias=False,
                     ),
                     nn.BatchNorm2d(hidden_channels),
-                    nn.ReLU(inplace=True),
-                    nn.Dropout2d(dropout_rate),
+                    nn.Sigmoid()
                 )
                 for _ in range(self.fusion_level - 1)
             ]
         )
+        self.final_temporal_layer = nn.Sequential(
+            nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels // 2,
+                kernel_size=3,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(hidden_channels // 2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=hidden_channels // 2,
+                out_channels=1,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            ),
+            nn.Sigmoid(),
+        )
 
-        # Final layer
-        if temporal_output:
-            self.final_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels // 2,
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels // 2),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    in_channels=hidden_channels // 2,
-                    out_channels=1,
-                    kernel_size=3,
-                    padding=1,
-                    bias=True,
-                ),
-                nn.Sigmoid(),
-            )
-        else:
-            self.final_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels // 2,
-                    kernel_size=3,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.BatchNorm2d(hidden_channels // 2),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    in_channels=hidden_channels // 2,
-                    out_channels=1,
-                    kernel_size=3,
-                    padding=1,
-                    bias=True,
-                ),
-                nn.ReLU(inplace=True),
-            )
-            self.final_merge_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=SEQUENCE_LENGTH,
-                    out_channels=1,
-                    kernel_size=3,
-                    padding=1,
-                    bias=True,
-                ),
-                nn.Sigmoid(),
-            )
+        self.final_global_layer = nn.Sequential(
+            nn.Conv2d(
+                in_channels=SEQUENCE_LENGTH,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=1,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            ),
+            nn.Sigmoid(),
+        )
 
     def _normalize_input(
         self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
@@ -574,36 +240,40 @@ class LiveSAL(nn.Module):
 
         return graph_features
 
-    def _get_decoded_features(
+    def _get_temporal_output(
         self,
         image_features_list: List[torch.Tensor],
     ) -> torch.Tensor:
+        # Decode the features
+        # Start with the last 2 features and go backwards
         x = image_features_list[-1]
-        y = image_features_list[-2]
-        for i, decoder_layer in enumerate(self.decoder_layers):
+        for i, temporal_layer in enumerate(self.temporal_layers):
+            y = image_features_list[-(i + 2)]
             x = nn.functional.interpolate(
                 x, size=y.shape[-2:], mode="bilinear", align_corners=False
             )
             x = torch.cat([x, y], dim=1)
-            x = decoder_layer(x)
-            if i < len(self.decoder_layers) - 1:
-                y = image_features_list[-(i + 3)]
+            x = temporal_layer(x)
 
-        return x
-
-    def _get_output_feature(
-        self, decoded_features: torch.Tensor, output_shape: Tuple[int, int]
-    ) -> torch.Tensor:
+        # Get the final decoded features
         decoded_features = nn.functional.interpolate(
-            decoded_features, size=output_shape, mode="bilinear", align_corners=False
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
-        output_feature = self.final_layer(decoded_features)
-        output_feature = output_feature.view(-1, SEQUENCE_LENGTH, *output_shape)
+        decoded_features = self.final_temporal_layer(decoded_features).squeeze(1)
 
-        if not self.temporal_output:
-            output_feature = self.final_merge_layer(output_feature).squeeze(1)
+        # Get temporal output from decoded features
+        batch_size_sequence_length, height, width = decoded_features.shape
+        temporal_output = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
 
-        return output_feature
+        return temporal_output
+
+    def _get_global_output(
+        self,
+        temporal_output: torch.Tensor,
+    ) -> torch.Tensor:
+        global_output = self.final_global_layer(temporal_output).squeeze(1)
+
+        return global_output
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -633,12 +303,13 @@ class LiveSAL(nn.Module):
                 graph_processor=self.graph_processor,
             )
 
-        # Decode features
-        decoded_features = self._get_decoded_features(
+        # Get temporal output
+        temporal_output = self._get_temporal_output(
             image_features_list=image_features_list,
         )
 
-        # Get output
-        output_feature = self._get_output_feature(decoded_features, x.shape[-2:])
+        global_output = self._get_global_output(
+            temporal_output=temporal_output,
+        )
 
-        return output_feature
+        return temporal_output, global_output

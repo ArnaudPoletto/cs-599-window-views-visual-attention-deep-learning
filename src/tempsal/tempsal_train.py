@@ -6,8 +6,8 @@ sys.path.append(str(GLOBAL_DIR))
 
 import torch
 import argparse
-import subprocess
 import torch.nn as nn
+from typing import List
 
 from src.losses.mse import MSELoss
 from src.utils.random import set_seed
@@ -30,8 +30,12 @@ from src.config import (
 
 def get_model(
     freeze_encoder: bool,
+    hidden_channels_list: List[int],
 ) -> nn.Module:
-    return TempSAL(freeze_encoder=freeze_encoder).to(DEVICE)
+    return TempSAL(
+        freeze_encoder=freeze_encoder,
+        hidden_channels_list=hidden_channels_list,
+    ).to(DEVICE)
 
 
 def get_criterion() -> nn.Module:
@@ -42,7 +46,7 @@ def get_criterion() -> nn.Module:
         {
             "kl": (kl_loss, 1.0),  # TODO: remove hardocded values
             "corr": (corr_loss, 1.0),  # TODO: remove hardocded values
-            "mse": (mse_loss, 0.0),
+            "mse": (mse_loss, 0.0), # TODO: remove hardocded values
         }
     )
 
@@ -120,6 +124,7 @@ def main() -> None:
     use_scaler = bool(config["use_scaler"])
     with_transforms = bool(config["with_transforms"])
     freeze_encoder = bool(config["freeze_encoder"])
+    hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataloaders, model, criterion, optimizer, and trainer
@@ -139,6 +144,7 @@ def main() -> None:
     )
     model = get_model(
         freeze_encoder=freeze_encoder,
+        hidden_channels_list=hidden_channels_list,
     )
     criterion = get_criterion()
     optimizer = get_optimizer(
