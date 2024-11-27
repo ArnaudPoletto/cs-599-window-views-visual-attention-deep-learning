@@ -19,7 +19,7 @@ from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader
 
 from src.metrics.metrics import Metrics
-from src.config import MODELS_PATH, SALICON_PATH, DEVICE
+from src.config import MODELS_PATH, SALICON_PATH, DHF1K_PATH, DEVICE
 
 
 class Trainer(ABC):
@@ -73,7 +73,14 @@ class Trainer(ABC):
             # Zero the gradients
             optimizer.zero_grad()
             temporal_train_loss, global_train_loss, _, _, _, _ = self._forward_pass(batch)
-            train_loss = temporal_train_loss + global_train_loss
+
+            # Get train loss as a sum of existing losses
+            train_loss = 0
+            if temporal_train_loss is not None:
+                train_loss = train_loss + temporal_train_loss
+            if global_train_loss is not None:
+                train_loss = train_loss + global_train_loss
+
             total_train_loss += train_loss.item()
             n_train_loss += 1
 
@@ -133,35 +140,50 @@ class Trainer(ABC):
             for batch in loader:
                 # Get loss and metrics
                 temporal_val_loss, global_val_loss, temporal_output, global_output, temporal_ground_truth, global_ground_truth = self._forward_pass(batch)
-                val_loss = temporal_val_loss + global_val_loss
 
+                # Get validation loss as a sum of existing losses
+                val_loss = 0
+                if temporal_val_loss is not None:
+                    val_loss = val_loss + temporal_val_loss
+                if global_val_loss is not None:
+                    val_loss = val_loss + global_val_loss
+
+                # Append loss to metrics
                 if "loss" not in metrics:
                     metrics["loss"] = []
                 metrics["loss"].append(val_loss.item())
-                if "temporal_loss" not in metrics:
-                    metrics["temporal_loss"] = []
-                metrics["temporal_loss"].append(temporal_val_loss.item())
-                if "global_loss" not in metrics:
-                    metrics["global_loss"] = []
-                metrics["global_loss"].append(global_val_loss.item())
+
+                # Append temporal and global losses to metrics
+                if temporal_val_loss is not None:
+                    if "temporal_loss" not in metrics:
+                        metrics["temporal_loss"] = []
+                    metrics["temporal_loss"].append(temporal_val_loss.item())
+                if global_val_loss is not None:
+                    if "global_loss" not in metrics:
+                        metrics["global_loss"] = []
+                    metrics["global_loss"].append(global_val_loss.item())
 
                 # Get center bias dataset for metrics
                 if self.dataset == "salicon":
                     center_bias_path = f"{SALICON_PATH}/center_bias.jpg"
                     center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(DEVICE)
-                else:
-                    center_bias = None
+                elif self.dataset == "dhf1k":
+                    center_bias_path = f"{DHF1K_PATH}/center_bias.jpg"
+                    center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(DEVICE)
 
-                new_temporal_metrics = Metrics().get_metrics(temporal_output, temporal_ground_truth, center_bias_prior=center_bias)
-                for key, value in new_temporal_metrics.items():
-                    if key not in metrics:
-                        metrics[f"temporal_{key}"] = []
-                    metrics[f"temporal_{key}"].append(value)
-                new_global_metrics = Metrics().get_metrics(global_output, global_ground_truth, center_bias_prior=center_bias)
-                for key, value in new_global_metrics.items():
-                    if key not in metrics:
-                        metrics[f"global_{key}"] = []
-                    metrics[f"global_{key}"].append(value)
+                # Get temporal and global metrics
+                if temporal_output is not None and temporal_ground_truth is not None:
+                    new_temporal_metrics = Metrics().get_metrics(temporal_output, temporal_ground_truth, center_bias_prior=center_bias)
+                    for key, value in new_temporal_metrics.items():
+                        if key not in metrics:
+                            metrics[f"temporal_{key}"] = []
+                        metrics[f"temporal_{key}"].append(value)
+                if global_output is not None and global_ground_truth is not None:
+                    new_global_metrics = Metrics().get_metrics(global_output, global_ground_truth, center_bias_prior=center_bias)
+                    for key, value in new_global_metrics.items():
+                        if key not in metrics:
+                            metrics[f"global_{key}"] = []
+                        metrics[f"global_{key}"].append(value)
 
         # Normalize metrics
         for key, value in metrics.items():

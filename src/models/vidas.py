@@ -246,7 +246,6 @@ class ViDaS(nn.Module):
     def __init__(
         self,
         input_channels: int,
-        output_channels: int,
         input_shape: Tuple[int, int, int],
         hidden_channels_list: List[int],
         kernel_sizes: List[int],
@@ -258,7 +257,6 @@ class ViDaS(nn.Module):
         super(ViDaS, self).__init__()
 
         self.input_channels = input_channels
-        self.output_channels = output_channels
         self.input_shape = input_shape
         self.hidden_channels_list = hidden_channels_list
         self.kernel_sizes = kernel_sizes
@@ -343,7 +341,7 @@ class ViDaS(nn.Module):
             nn.ReLU(),
             nn.Conv2d(
                 in_channels=saliency_out_channels // 2,
-                out_channels=output_channels,
+                out_channels=1,
                 kernel_size=1,
                 padding=0,
                 bias=True,
@@ -388,9 +386,6 @@ class ViDaS(nn.Module):
             decoded_maps = torch.cat([image_decoded_maps, depth_decoded_maps], dim=1)
         else:
             decoded_maps = image_decoded_maps
-        output = self.final_layer(decoded_maps)
+        global_output = self.final_layer(decoded_maps).squeeze(1)
 
-        if self.output_channels == 1:
-            output = output.squeeze(1)
-
-        return output
+        return global_output

@@ -28,7 +28,6 @@ from src.config import (
 
 def get_model(
     input_channels: int,
-    output_channels: int,
     input_shape: tuple,
     hidden_channels_list: list,
     kernel_sizes: list,
@@ -39,7 +38,6 @@ def get_model(
 ) -> ViDaS:
     return ViDaS(
         input_channels=input_channels,
-        output_channels=output_channels,
         input_shape=input_shape,
         hidden_channels_list=hidden_channels_list,
         kernel_sizes=kernel_sizes,
@@ -88,6 +86,7 @@ def get_trainer(
         evaluation_steps=evaluation_steps,
         use_scaler=use_scaler,
         name=f"vidas",
+        dataset="dhf1k",
     )
 
 def parse_arguments() -> argparse.Namespace:
@@ -131,7 +130,6 @@ def main() -> None:
     use_scaler = bool(config["use_scaler"])
     with_transforms = bool(config["with_transforms"])
     input_channels = int(config["input_channels"])
-    output_channels = int(config["output_channels"])
     input_shape = tuple(map(int, config["input_shape"]))
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     kernel_sizes = list(map(int, config["kernel_sizes"]))
@@ -160,7 +158,6 @@ def main() -> None:
     
     model = get_model(
         input_channels=input_channels,
-        output_channels=output_channels,
         input_shape=input_shape,
         hidden_channels_list=hidden_channels_list,
         kernel_sizes=kernel_sizes,

@@ -17,4 +17,4 @@ kernel_sizes: [5, 3, 3, 3]
 use_max_poolings: [False, True, False, False]
 saliency_out_channels: 64
 attention_out_channels: 16
-with_depth_information: True
+with_depth_information: False

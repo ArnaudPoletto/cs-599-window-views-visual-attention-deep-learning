@@ -32,7 +32,6 @@ class ViDaSTrainer(Trainer):
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
             "input_channels": self.model.input_channels,
-            "output_channels": self.model.output_channels,
             "input_shape": self.model.input_shape,
             "hidden_channels_list": self.model.hidden_channels_list,
             "kernel_sizes": self.model.kernel_sizes,
@@ -57,13 +56,9 @@ class ViDaSTrainer(Trainer):
 
         # Forward pass
         with autocast(enabled=self.use_scaler):
-            outputs = self.model(frame)
+            global_output = self.model(frame)
 
         # Get loss
-        if self.model.output_channels == 1:
-            ground_truth = global_ground_truth
-        else:
-            ground_truth = ground_truths
-        loss = self.criterion(outputs, ground_truth)
+        global_loss = self.criterion(global_output, global_ground_truth)
 
-        return loss, outputs, ground_truth
+        return None, global_loss, None, global_output, None, global_ground_truth
