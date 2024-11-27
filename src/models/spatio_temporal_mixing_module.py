@@ -80,7 +80,7 @@ class SpatioTemporalMixingModule(nn.Module):
 
     def forward(
         self,
-        encoded_features: torch.Tensor,
+        encoded_features_list: List[torch.Tensor],
         temporal_features: torch.Tensor,
         global_features: torch.Tensor,
     ) -> torch.Tensor:
@@ -99,9 +99,9 @@ class SpatioTemporalMixingModule(nn.Module):
         # Decode the features
         # Start with the last 2 encoded features and go backwards, concatenating the temporal and global saliency
         # features with the encoded features for the next steps
-        x = encoded_features[-1]
+        x = encoded_features_list[-1]
         for i, decoder_layer in enumerate(self.decoder_layers):
-            y = encoded_features[-(i + 2)]
+            y = encoded_features_list[-(i + 2)]
             # Start with the first layer, where we only need to resize the encoded features
             if i == 0:
                 x = nn.functional.interpolate(

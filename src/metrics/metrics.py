@@ -20,6 +20,48 @@ class Metrics():
             saliency_map.sum(dim=(-2, -1), keepdim=True) + self.eps
         )
         return normalized
+    
+    def kldiv(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        pred, target = self._reshape_4d(pred, target)
+
+        # Normalize maps
+        pred = self._normalize_map(pred)
+        target = self._normalize_map(target)
+
+        # Apply softmax to both predictions and targets
+        target_soft = F.softmax(target, dim=-1)
+        pred_log_soft = F.log_softmax(pred, dim=-1)
+
+        # Calculate KL divergence
+        kl = F.kl_div(
+            pred_log_soft, 
+            target_soft, 
+            reduction='batchmean', 
+            log_target=False
+        )
+
+        return kl
+    
+    def cc(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        pred, target = self._reshape_4d(pred, target)
+
+        # Calculate correlation coefficient
+        pred_mean = pred.mean(dim=(-2, -1), keepdim=True)
+        target_mean = target.mean(dim=(-2, -1), keepdim=True)
+
+        # Center the maps by subtracting their means
+        pred_centered = pred - pred_mean
+        target_centered = target - target_mean
+
+        # Calculate correlation
+        numerator = (pred_centered * target_centered).sum(dim=(-2, -1))
+        denominator = torch.sqrt(
+            (pred_centered**2).sum(dim=(-2, -1))
+            * (target_centered**2).sum(dim=(-2, -1))
+            + self.eps
+        )
+
+        return (numerator / denominator).mean()
 
     def auc(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
@@ -63,27 +105,6 @@ class Metrics():
         )
         return nss_score.mean()
 
-    def cc(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        pred, target = self._reshape_4d(pred, target)
-
-        # Calculate correlation coefficient
-        pred_mean = pred.mean(dim=(-2, -1), keepdim=True)
-        target_mean = target.mean(dim=(-2, -1), keepdim=True)
-
-        # Center the maps by subtracting their means
-        pred_centered = pred - pred_mean
-        target_centered = target - target_mean
-
-        # Calculate correlation
-        numerator = (pred_centered * target_centered).sum(dim=(-2, -1))
-        denominator = torch.sqrt(
-            (pred_centered**2).sum(dim=(-2, -1))
-            * (target_centered**2).sum(dim=(-2, -1))
-            + self.eps
-        )
-
-        return (numerator / denominator).mean()
-
     def sim(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
@@ -124,9 +145,10 @@ class Metrics():
     ) -> dict:
         """Calculate all metrics at once."""
         metrics = {
+            "kldiv": self.kldiv(pred, target),
+            "cc": self.cc(pred, target),
             "auc": self.auc(pred, target),
             "nss": self.nss(pred, target),
-            "cc": self.cc(pred, target),
             "sim": self.sim(pred, target),
         }
 
