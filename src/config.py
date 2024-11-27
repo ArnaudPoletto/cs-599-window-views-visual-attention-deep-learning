@@ -37,6 +37,11 @@ FIXATION_DATA_PATH = f"{GAZE_PATH}/fixation_data.csv"
 IMAGE_ENCODER_MODEL_NAME = "pnasnet5large"
 IMAGE_ENCODER_PRETRAINED = True
 
+LOSS_WEIGHTS = {
+    "kl": 10.0,
+    "cc": 1.0,
+}
+
 IMAGE_SIZE = 331
 SEQUENCE_LENGTH = 5
 N_WORKERS = 1

@@ -261,9 +261,9 @@ class LiveSAL(nn.Module):
 
     def _get_global_output(
         self,
-        temporal_output: torch.Tensor,
+        temporal_features: torch.Tensor,
     ) -> torch.Tensor:
-        global_output = self.final_global_layer(temporal_output).squeeze(1)
+        global_output = self.final_global_layer(temporal_features).squeeze(1)
 
         return global_output
 

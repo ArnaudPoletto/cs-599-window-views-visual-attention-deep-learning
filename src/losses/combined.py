@@ -22,7 +22,6 @@ class CombinedLoss(nn.Module):
 
         for name, loss_fn in self.losses.items():
             current_loss = loss_fn(pred, target)
-            print("current_loss", current_loss, loss_fn)
             weighted_loss = current_loss * self.weights[name]
             total_loss += weighted_loss
             losses_dict[name] = current_loss.item()

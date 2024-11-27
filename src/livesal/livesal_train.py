@@ -26,8 +26,9 @@ from src.config import (
     DEVICE,
     N_WORKERS,
     CONFIG_PATH,
-    PROCESSED_SALICON_PATH,
+    LOSS_WEIGHTS,
     PROCESSED_DHF1K_PATH,
+    PROCESSED_SALICON_PATH,
 )
 
 def _get_dataloaders(
@@ -99,9 +100,8 @@ def get_criterion() -> nn.Module:
     mse_loss = MSELoss()
     criterion = CombinedLoss(
         {
-            "kl": (kl_loss, 1.0), # TODO: remove hardocded values
-            "corr": (corr_loss, 1.0), # TODO: remove hardocded values
-            "mse": (mse_loss, 0.0),
+            "kl": (kl_loss, LOSS_WEIGHTS["kl"]),
+            "cc": (corr_loss, LOSS_WEIGHTS["cc"]),
         }
     )
 
