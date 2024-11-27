@@ -8,7 +8,7 @@ import torch
 from typing import List
 from torch import nn
 
-IMAGE_SIZE = 331
+from src.config import IMAGE_SIZE
 
 
 class ImageDecoder(nn.Module):
@@ -24,12 +24,12 @@ class ImageDecoder(nn.Module):
         output_channels: int,
     ) -> None:
         """
-        Initializes the image decoder.
+        Initialize the image decoder.
 
         Args:
             features_channels (List[int]): The number of channels of the features to decode.
-            hidden_channels (List[int]): The number of hidden channels to use.
-            features_sizes (List[int]): The sizes of the features to decode.
+            hidden_channels (List[int]): The number of hidden channels to use, i.e. the number of output channels of the decoder layers.
+            features_sizes (List[int]): The spatial size of the features to decode.
             output_channels (int): The number of output channels.
         """
         super(ImageDecoder, self).__init__()
@@ -40,7 +40,9 @@ class ImageDecoder(nn.Module):
 
         # Get the decoder layers
         in_channels_list = [features_channels_list[-1]] + hidden_channels_list[1:][::-1]
-        inc_channels_list = [features_channels_list[-2]] + features_channels_list[:-2][::-1]
+        inc_channels_list = [features_channels_list[-2]] + features_channels_list[:-2][
+            ::-1
+        ]
         out_channels_list = hidden_channels_list[::-1]
         self.decoder_layers = nn.ModuleList(
             [
@@ -93,15 +95,21 @@ class ImageDecoder(nn.Module):
         Returns:
             torch.Tensor: The decoded image.
         """
+        # Decode the features
+        # Start with the last 2 features and go backwards
         x = xs[-1]
-        y = xs[-2]
         for i, decoder_layer in enumerate(self.decoder_layers):
             y = xs[-(i + 2)]
-            x = nn.functional.interpolate(x, size=y.shape[-2:], mode='bilinear', align_corners=False)
+            x = nn.functional.interpolate(
+                x, size=y.shape[-2:], mode="bilinear", align_corners=False
+            )
             x = torch.cat([x, y], dim=1)
             x = decoder_layer(x)
 
-        output = nn.functional.interpolate(x, size=(IMAGE_SIZE, IMAGE_SIZE), mode='bilinear', align_corners=False)
+        # Get the final output
+        output = nn.functional.interpolate(
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
+        )
         output = self.final_layer(output)
 
         return output
