@@ -11,7 +11,6 @@ use_scaler: True
 with_transforms: True
 
 hidden_channels: 64
-with_relative_positional_embeddings: True
 neighbor_radius: 1
 n_iterations: 3
 with_graph_processing: True

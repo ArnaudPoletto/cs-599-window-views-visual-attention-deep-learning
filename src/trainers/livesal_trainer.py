@@ -32,7 +32,6 @@ class LiveSALTrainer(Trainer):
     def _get_wandb_config(self) -> Dict[str, Any]:
         return {
             "hidden_channels": self.model.hidden_channels,
-            "with_relative_positional_embeddings": self.model.with_relative_positional_embeddings,
             "neighbor_radius": self.model.neighbor_radius,
             "n_iterations": self.model.n_iterations,
             "with_graph_processing": self.model.with_graph_processing,

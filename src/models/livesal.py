@@ -13,7 +13,6 @@ class LiveSAL(nn.Module):
     def __init__(
         self,
         hidden_channels: int,
-        with_relative_positional_embeddings: bool,
         neighbor_radius: int,
         n_iterations: int,
         with_graph_processing: bool,
@@ -24,7 +23,6 @@ class LiveSAL(nn.Module):
         super(LiveSAL, self).__init__()
 
         self.hidden_channels = hidden_channels
-        self.with_relative_positional_embeddings = with_relative_positional_embeddings
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
         self.with_graph_processing = with_graph_processing
@@ -95,7 +93,6 @@ class LiveSAL(nn.Module):
             last_feature_size = self.image_encoder.feature_sizes[-1]
             self.graph_processor = GraphProcessor(
                 hidden_channels=hidden_channels,
-                with_relative_positional_embeddings=with_relative_positional_embeddings,
                 neighbor_radius=neighbor_radius,
                 fusion_size=last_feature_size,
                 n_iterations=n_iterations,
