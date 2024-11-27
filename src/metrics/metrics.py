@@ -24,13 +24,13 @@ class Metrics():
     def kldiv(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
-        # Normalize maps
-        pred = self._normalize_map(pred)
-        target = self._normalize_map(target)
+        # Reshape as 2D tensors
+        pred = pred.view(pred.size(0), -1)
+        target = target.view(target.size(0), -1)
 
         # Apply softmax to both predictions and targets
-        target_soft = F.softmax(target, dim=-1)
-        pred_log_soft = F.log_softmax(pred, dim=-1)
+        target_soft = F.softmax(target, dim=1)
+        pred_log_soft = F.log_softmax(pred, dim=1)
 
         # Calculate KL divergence
         kl = F.kl_div(

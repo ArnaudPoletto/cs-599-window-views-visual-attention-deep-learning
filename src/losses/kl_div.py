@@ -18,8 +18,12 @@ class KLDivLoss(nn.Module):
         # Reshape predictions and targets if they are 4D tensors
         if pred.dim() == 4:
             batch_size, sequence_length, height, width = pred.shape
-            pred = pred.view(batch_size * sequence_length, height, width)
-            target = target.view(batch_size * sequence_length, height, width)
+            pred = pred.view(batch_size * sequence_length, height * width)
+            target = target.view(batch_size * sequence_length, height * width)
+        else:
+            batch_size, height, width = pred.shape
+            pred = pred.view(batch_size, height * width)
+            target = target.view(batch_size, height * width)
 
         # Prepare predictions and targets
         target = torch.softmax(target, dim=1)

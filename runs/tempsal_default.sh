@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=livesal
+#SBATCH --job-name=tempsal
 #SBATCH --output=/scratch/izar/poletto/logs/log_tempsal_default_%j.out
 #SBATCH --error=/scratch/izar/poletto/logs/log_tempsal_default_%j.err
 #SBATCH --nodes=1
