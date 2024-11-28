@@ -62,9 +62,10 @@ class ImageEncoder(nn.Module):
         Returns:
             List[int]: The sizes of the features extracted by the model.
         """
-        x = torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE)
-        image_features = self.pnas(x)
-        feature_sizes = [image_feature.size()[-1] for image_feature in image_features]
+        with torch.no_grad():
+            x = torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE)
+            image_features = self.pnas(x)
+            feature_sizes = [image_feature.size()[-1] for image_feature in image_features]
 
         return feature_sizes
 

@@ -44,7 +44,7 @@ LOSS_WEIGHTS = {
 
 IMAGE_SIZE = 331
 SEQUENCE_LENGTH = 5
-N_WORKERS = 1
+N_WORKERS = 4
 
 SEED = 0
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
