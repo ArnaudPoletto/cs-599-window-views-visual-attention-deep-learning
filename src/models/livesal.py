@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from typing import List, Tuple
 
+from src.models.depth_encoder import DepthEncoder
 from src.models.image_encoder import ImageEncoder
 from src.models.depth_estimator import DepthEstimator
 from src.models.graph_processor import GraphProcessor
@@ -68,6 +69,10 @@ class LiveSAL(nn.Module):
             self.depth_estimator = DepthEstimator(
                 freeze=freeze_encoder,
             )
+            self.depth_encoder = DepthEncoder(
+                in_channels=1,
+                hidden_channels=hidden_channels,
+            )
 
         self.image_projection_layers = nn.ModuleList(
             [
@@ -96,23 +101,28 @@ class LiveSAL(nn.Module):
         )
 
         if with_graph_processing:
-            last_feature_size = self.image_encoder.feature_sizes[-1]
-            self.graph_processor = GraphProcessor(
-                hidden_channels=hidden_channels,
-                neighbor_radius=neighbor_radius,
-                fusion_size=last_feature_size,
-                n_iterations=n_iterations,
-                dropout_rate=self.dropout_rate,
-                with_edge_features=with_graph_edge_features,
-                with_positional_embeddings=with_graph_positional_embeddings,
-                with_directional_kernels=with_graph_directional_kernels,
-            )
+            self.graph_processors = nn.ModuleList([
+                GraphProcessor(
+                    hidden_channels=hidden_channels,
+                    neighbor_radius=neighbor_radius,
+                    fusion_size=feature_size,
+                    n_iterations=n_iterations,
+                    dropout_rate=self.dropout_rate,
+                    with_edge_features=with_graph_edge_features,
+                    with_positional_embeddings=with_graph_positional_embeddings,
+                    with_directional_kernels=with_graph_directional_kernels,
+                )
+                for feature_size in self.image_encoder.feature_sizes[-3:]
+            ])
 
+        temporal_in_channels = hidden_channels * 2
+        if with_depth_information:
+            temporal_in_channels += hidden_channels
         self.temporal_layers = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
-                        in_channels=hidden_channels * 2,
+                        in_channels=temporal_in_channels,
                         out_channels=hidden_channels,
                         kernel_size=3,
                         padding=1,
@@ -240,6 +250,18 @@ class LiveSAL(nn.Module):
         graph_features = graph_features + image_features
 
         return graph_features
+    
+    def _get_depth_features(self, x: torch.Tensor, is_image: bool) -> torch.Tensor:
+        if not is_image:
+            batch_size, sequence_length, channels, height, width = x.shape
+            x = x.view(-1, channels, height, width)
+
+        # Normalize and get depth features
+        x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
+        depth_estimation = self.depth_estimator(x_depth)
+        depth_features = self.depth_encoder(depth_estimation)
+
+        return depth_features
 
     def _get_temporal_features(
         self,
@@ -301,8 +323,25 @@ class LiveSAL(nn.Module):
         if self.with_graph_processing:
             image_features_list[-1] = self._get_graph_features(
                 image_features=image_features_list[-1],
-                graph_processor=self.graph_processor,
+                graph_processor=self.graph_processors[-1],
             )
+            image_features_list[-2] = self._get_graph_features(
+                image_features=image_features_list[-2],
+                graph_processor=self.graph_processors[-2],
+            )
+            image_features_list[-3] = self._get_graph_features(
+                image_features=image_features_list[-3],
+                graph_processor=self.graph_processors[-3],
+            )
+
+        if self.with_depth_information:
+            depth_features = self._get_depth_features(x, is_image)
+            print("depth_features", depth_features.shape)
+            if self.with_graph_processing:
+                depth_features = self._get_graph_features(
+                    image_features=depth_features,
+                    graph_processor=self.depth_graph_processors[-1],
+                )
 
         # Get temporal output
         temporal_features = self._get_temporal_features(

@@ -77,7 +77,6 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=True,
             ),
-            nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
             nn.ReLU(inplace=True),
         )
         self.intra_alpha = nn.Parameter(torch.tensor(0.5))
@@ -185,7 +184,6 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=True,
             ),
-            nn.LayerNorm([hidden_channels, fusion_size, fusion_size]),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout_rate),
         )

@@ -36,8 +36,11 @@ class LiveSALTrainer(Trainer):
             "n_iterations": self.model.n_iterations,
             "with_graph_processing": self.model.with_graph_processing,
             "freeze_encoder": self.model.freeze_encoder,
-            "with_depth_information": self.model.with_depth_information,
             "dropout_rate": self.model.dropout_rate,
+            "with_graph_edge_features": self.model.with_graph_edge_features,
+            "with_graph_positional_embeddings": self.model.with_graph_positional_embeddings,
+            "with_graph_directional_kernels": self.model.with_graph_directional_kernels,
+            "with_depth_information": self.model.with_depth_information,
             "fusion_level": self.model.fusion_level,
 
         }
