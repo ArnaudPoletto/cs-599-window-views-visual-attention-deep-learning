@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from typing import List, Optional
 
+from src.models.depth_decoder import DepthDecoder
 from src.models.depth_encoder import DepthEncoder
 from src.models.image_encoder import ImageEncoder
 from src.models.depth_estimator import DepthEstimator
@@ -75,12 +76,15 @@ class LiveSAL(nn.Module):
             self.depth_graph_processor = GraphProcessor(
                 hidden_channels=hidden_channels,
                 neighbor_radius=neighbor_radius,
-                fusion_size=83, # TODO: removed hardcoded
+                fusion_size=self.depth_encoder.features_size,
                 n_iterations=n_iterations,
                 dropout_rate=dropout_rate,
                 with_edge_features=with_graph_edge_features,
                 with_positional_embeddings=with_graph_positional_embeddings,
                 with_directional_kernels=with_graph_directional_kernels,
+            )
+            self.depth_decoder = DepthDecoder(
+                hidden_channels=hidden_channels,
             )
 
         self.image_projection_layers = nn.ModuleList(
@@ -124,14 +128,11 @@ class LiveSAL(nn.Module):
                 for feature_size in self.image_encoder.feature_sizes[-3:]
             ])
 
-        temporal_in_channels = hidden_channels * 2
-        if with_depth_information:
-            temporal_in_channels += hidden_channels
         self.temporal_layers = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
-                        in_channels=temporal_in_channels,
+                        in_channels=hidden_channels * 2,
                         out_channels=hidden_channels,
                         kernel_size=3,
                         padding=1,
@@ -154,9 +155,12 @@ class LiveSAL(nn.Module):
                 for _ in range(self.fusion_level - 1)
             ]
         )
+        final_temporal_layer_in_channels = hidden_channels
+        if with_depth_information:
+            final_temporal_layer_in_channels += hidden_channels
         self.final_temporal_layer = nn.Sequential(
             nn.Conv2d(
-                in_channels=hidden_channels,
+                in_channels=final_temporal_layer_in_channels,
                 out_channels=hidden_channels // 2,
                 kernel_size=3,
                 padding=1,
@@ -260,7 +264,7 @@ class LiveSAL(nn.Module):
 
         return graph_features
     
-    def _get_depth_features(self, x: torch.Tensor, is_image: bool) -> torch.Tensor:
+    def _get_depth_encoded_features(self, x: torch.Tensor, is_image: bool) -> torch.Tensor:
         if not is_image:
             batch_size, sequence_length, channels, height, width = x.shape
             x = x.view(-1, channels, height, width)
@@ -268,7 +272,7 @@ class LiveSAL(nn.Module):
         # Normalize and get depth features
         x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
         depth_estimation = self.depth_estimator(x_depth)
-        depth_features = self.depth_encoder(depth_estimation)
+        depth_features, depth_skip_features_list = self.depth_encoder(depth_estimation)
 
         if is_image:
             depth_features = depth_features.unsqueeze(1).repeat(
@@ -277,12 +281,31 @@ class LiveSAL(nn.Module):
             batch_size, sequence_length, channels, height, width = depth_features.shape
             depth_features = depth_features.view(-1, channels, height, width)
 
-        return depth_features
+            new_depth_skip_features_list = []
+            for depth_skip_features in depth_skip_features_list:
+                depth_skip_features = depth_skip_features.unsqueeze(1).repeat(
+                    1, SEQUENCE_LENGTH, 1, 1, 1
+                )
+                batch_size, sequence_length, channels, height, width = depth_skip_features.shape
+                depth_skip_features = depth_skip_features.view(-1, channels, height, width)
+                new_depth_skip_features_list.append(depth_skip_features)
+            depth_skip_features_list = new_depth_skip_features_list
+
+        return depth_features, depth_skip_features_list
+    
+    def _get_depth_decoded_features(
+        self,
+        depth_features: torch.Tensor,
+        depth_skip_features_list: List[torch.Tensor],
+    ) -> torch.Tensor:
+        depth_decoded_features = self.depth_decoder(depth_features, depth_skip_features_list)
+
+        return depth_decoded_features
 
     def _get_temporal_features(
         self,
         image_features_list: List[torch.Tensor],
-        depth_features: Optional[torch.Tensor],
+        depth_decoded_features: Optional[torch.Tensor],
     ) -> torch.Tensor:
         # Decode the features
         # Start with the last 2 features and go backwards
@@ -292,21 +315,15 @@ class LiveSAL(nn.Module):
             x = nn.functional.interpolate(
                 x, size=y.shape[-2:], mode="bilinear", align_corners=False
             )
-            
-            if self.with_depth_information:
-                depth = nn.functional.interpolate(
-                    depth_features, size=y.shape[-2:], mode="bilinear", align_corners=False
-                )
-                x = torch.cat([x, y, depth], dim=1)
-            else:
-                x = torch.cat([x, y], dim=1)
-
+            x = torch.cat([x, y], dim=1)
             x = temporal_layer(x)
 
         # Get the final decoded features
         decoded_features = nn.functional.interpolate(
             x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
+        if self.with_depth_information:
+            decoded_features = torch.cat([decoded_features, depth_decoded_features], dim=1)
         decoded_features = self.final_temporal_layer(decoded_features).squeeze(1)
 
         # Get temporal output from decoded features
@@ -360,19 +377,23 @@ class LiveSAL(nn.Module):
             )
 
         if self.with_depth_information:
-            depth_features = self._get_depth_features(x, is_image)
+            depth_encoded_features, depth_skip_features_list = self._get_depth_encoded_features(x, is_image)
             if self.with_graph_processing:
                 depth_features = self._get_graph_features(
-                    image_features=depth_features,
+                    image_features=depth_encoded_features,
                     graph_processor=self.depth_graph_processor,
                 )
+            depth_decoded_features = self._get_depth_decoded_features(
+                depth_features=depth_features,
+                depth_skip_features_list=depth_skip_features_list,
+            )
         else:
-            depth_features = None
+            depth_decoded_features = None
 
         # Get temporal output
         temporal_features = self._get_temporal_features(
             image_features_list=image_features_list,
-            depth_features=depth_features,
+            depth_decoded_features=depth_decoded_features,
         )
         temporal_output = self.sigmoid(temporal_features)
 
