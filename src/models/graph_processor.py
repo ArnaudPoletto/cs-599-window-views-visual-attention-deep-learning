@@ -15,6 +15,9 @@ class GraphProcessor(nn.Module):
         neighbor_radius: int,
         n_iterations: int,
         dropout_rate: float,
+        with_edge_features: bool,
+        with_positional_embeddings: bool,
+        with_directional_kernels: bool,
     ) -> None:
         """
         Initialize the graph processor module.
@@ -25,6 +28,9 @@ class GraphProcessor(nn.Module):
             neighbor_radius (int): The neighbor radius.
             n_iterations (int): The number of iterations.
             dropout_rate (float): The dropout rate.
+            with_edge_features (bool): Whether to use edge features.
+            with_positional_embeddings (bool): Whether to use positional embeddings.
+            with_directional_kernels (bool): Whether to use directional kernels.
         """
         super(GraphProcessor, self).__init__()
 
@@ -33,6 +39,9 @@ class GraphProcessor(nn.Module):
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
         self.dropout_rate = dropout_rate
+        self.with_edge_features = with_edge_features
+        self.with_positional_embeddings = with_positional_embeddings
+        self.with_directional_kernels = with_directional_kernels
         self.scale = hidden_channels**-0.5
 
         self.spatial_dropout = nn.Dropout2d(dropout_rate)
@@ -73,10 +82,17 @@ class GraphProcessor(nn.Module):
         )
         self.intra_alpha = nn.Parameter(torch.tensor(0.5))
 
+        if with_positional_embeddings:
+            self.positional_embeddings = nn.Parameter(
+                torch.randn(2, 1, fusion_size, fusion_size)
+            )
+
         # Get inter-attention components
-        inter_message_edge_in_channels = (
-            hidden_channels# + 2
-        )
+        inter_message_edge_in_channels = hidden_channels
+        if with_positional_embeddings:
+            inter_message_edge_in_channels += 1
+        if with_edge_features:
+            inter_message_edge_in_channels += 2 # TODO: adapt given edge features dimension
         self.inter_message_edge_conv = nn.Conv2d(
             in_channels=inter_message_edge_in_channels,
             out_channels=hidden_channels,
@@ -84,27 +100,71 @@ class GraphProcessor(nn.Module):
             padding=1,
             bias=True,
         )
-        self.inter_query_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.inter_key_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
-        self.inter_value_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
-            kernel_size=3,
-            padding=1,
-            bias=True,
-        )
+        if with_directional_kernels:
+            self.future_inter_query_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+            self.future_inter_key_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+            self.future_inter_value_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+            self.past_inter_query_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+            self.past_inter_key_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+            self.past_inter_value_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+        else:
+            self.inter_query_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+            self.inter_key_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
+            self.inter_value_conv = nn.Conv2d(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=3,
+                padding=1,
+                bias=True,
+            )
         self.inter_gate_conv = nn.Sequential(
             nn.Conv2d(
                 in_channels=hidden_channels * 2,
@@ -165,25 +225,25 @@ class GraphProcessor(nn.Module):
 
         return output
 
-    # def _get_temporal_encoding(
-    #     self, relative_position: int, is_future: bool, device: torch.device
-    # ) -> torch.Tensor:
-    #     """
-    #     Get the temporal encoding.
+    def _get_temporal_encoding(
+        self, relative_position: int, is_future: bool, device: torch.device
+    ) -> torch.Tensor:
+        """
+        Get the temporal encoding.
         
-    #     Args:
-    #         relative_position (int): The relative position.
-    #         is_future (bool): Whether the position is in the future.
-    #         device (torch.device): The device.
+        Args:
+            relative_position (int): The relative position.
+            is_future (bool): Whether the position is in the future.
+            device (torch.device): The device.
             
-    #     Returns:
-    #         torch.Tensor: The temporal encoding.
-    #     """
-    #     direction = torch.tensor(1.0 if is_future else -1.0, device=device)
-    #     distance = torch.tensor(float(abs(relative_position)), device=device)
-    #     temporal_information = torch.stack([direction, distance])
+        Returns:
+            torch.Tensor: The temporal encoding.
+        """
+        direction = torch.tensor(1.0 if is_future else -1.0, device=device)
+        distance = torch.tensor(float(abs(relative_position)), device=device)
+        temporal_encoding = torch.stack([direction, distance])
 
-    #     return temporal_information
+        return temporal_encoding
 
     def _compute_inter_attention(
         self, i: int, x: torch.Tensor, neighbors: List[Tuple[int, torch.Tensor]]
@@ -201,23 +261,42 @@ class GraphProcessor(nn.Module):
         messages = []
         gates = []
         for j, y in neighbors:
-            index = i - j + self.neighbor_radius - 1
             is_future = i < j
 
-            # Add temporal encoding
-            #relative_position = (i - j) / self.neighbor_radius
-            #temporal_encoding = self._get_temporal_encoding(
-            #    relative_position, is_future, x.device
-            #)
-            #temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(
-            #    batch_size, -1, height, width
-            #)
-            #y = torch.cat([y, temporal_encoding], dim=1)
+            # Concatenate temporal encoding
+            if self.with_edge_features:
+                relative_position = (i - j) / self.neighbor_radius
+                temporal_encoding = self._get_temporal_encoding(
+                relative_position=relative_position, 
+                is_future=is_future, 
+                device=x.device,
+                )
+                temporal_encoding = temporal_encoding.view(1, -1, 1, 1).expand(
+                batch_size, -1, height, width
+                )
+                y = torch.cat([y, temporal_encoding], dim=1)
+
+            # Concatenate positional embeddings
+            if self.with_positional_embeddings:
+                positional_embeddings = self.positional_embeddings[int(is_future)].unsqueeze(0).expand(batch_size, -1, -1, -1)
+                y = torch.cat([y, positional_embeddings], dim=1)
+
             y = self.inter_message_edge_conv(y)
 
-            query = self.inter_query_conv(x).view(batch_size, channels, -1)
-            key = self.inter_key_conv(y).view(batch_size, channels, -1)
-            value = self.inter_value_conv(y).view(batch_size, channels, -1)
+            # Optionally use directional kernels
+            if self.with_directional_kernels:
+                inter_query_conv = self.future_inter_query_conv if is_future else self.past_inter_query_conv
+                inter_key_conv = self.future_inter_key_conv if is_future else self.past_inter_key_conv
+                inter_value_conv = self.future_inter_value_conv if is_future else self.past_inter_value_conv
+            else:
+                inter_query_conv = self.inter_query_conv
+                inter_key_conv = self.inter_key_conv
+                inter_value_conv = self.inter_value_conv
+
+            # Compute attention
+            query = inter_query_conv(x).view(batch_size, channels, -1)
+            key = inter_key_conv(y).view(batch_size, channels, -1)
+            value = inter_value_conv(y).view(batch_size, channels, -1)
 
             attention = torch.bmm(query.transpose(1, 2), key) * self.scale
             attention = torch.softmax(attention, dim=-1)

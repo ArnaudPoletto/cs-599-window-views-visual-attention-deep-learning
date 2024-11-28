@@ -15,5 +15,8 @@ neighbor_radius: 1
 n_iterations: 3
 with_graph_processing: True
 freeze_encoder: True
-with_depth_information: False
 dropout_rate: 0.0
+with_graph_edge_features: True
+with_graph_positional_embeddings: True
+with_graph_directional_kernels: True
+with_depth_information: False

@@ -80,8 +80,11 @@ def get_model(
     n_iterations: int,
     with_graph_processing: bool,
     freeze_encoder: bool,
-    with_depth_information: bool,
     dropout_rate: float,
+    with_graph_edge_features: bool,
+    with_graph_positional_embeddings: bool,
+    with_graph_directional_kernels: bool,
+    with_depth_information: bool,
 ) -> nn.Module:
     return LiveSAL(
         hidden_channels=hidden_channels,
@@ -89,8 +92,11 @@ def get_model(
         n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
-        with_depth_information=with_depth_information,
         dropout_rate=dropout_rate,
+        with_graph_edge_features=with_graph_edge_features,
+        with_graph_positional_embeddings=with_graph_positional_embeddings,
+        with_graph_directional_kernels=with_graph_directional_kernels,
+        with_depth_information=with_depth_information,
     ).to(DEVICE)
 
 
@@ -186,8 +192,11 @@ def main() -> None:
     n_iterations = int(config["n_iterations"])
     with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
-    with_depth_information = bool(config["with_depth_information"])
     dropout_rate = float(config["dropout_rate"])
+    with_graph_edge_features = bool(config["with_graph_edge_features"])
+    with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
+    with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
+    with_depth_information = bool(config["with_depth_information"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataloaders, model, criterion, optimizer, and trainer
@@ -203,8 +212,11 @@ def main() -> None:
         n_iterations=n_iterations,
         with_graph_processing=with_graph_processing,
         freeze_encoder=freeze_encoder,
-        with_depth_information=with_depth_information,
         dropout_rate=dropout_rate,
+        with_graph_edge_features=with_graph_edge_features,
+        with_graph_positional_embeddings=with_graph_positional_embeddings,
+        with_graph_directional_kernels=with_graph_directional_kernels,
+        with_depth_information=with_depth_information,
     )
     criterion = get_criterion()
     optimizer = get_optimizer(

@@ -17,8 +17,11 @@ class LiveSAL(nn.Module):
         n_iterations: int,
         with_graph_processing: bool,
         freeze_encoder: bool,
-        with_depth_information: bool,
         dropout_rate: float,
+        with_graph_edge_features: bool,
+        with_graph_positional_embeddings: bool,
+        with_graph_directional_kernels: bool,
+        with_depth_information: bool,
     ):
         super(LiveSAL, self).__init__()
 
@@ -27,8 +30,11 @@ class LiveSAL(nn.Module):
         self.n_iterations = n_iterations
         self.with_graph_processing = with_graph_processing
         self.freeze_encoder = freeze_encoder
-        self.with_depth_information = with_depth_information
         self.dropout_rate = dropout_rate
+        self.with_graph_edge_features = with_graph_edge_features
+        self.with_graph_positional_embeddings = with_graph_positional_embeddings
+        self.with_graph_directional_kernels = with_graph_directional_kernels
+        self.with_depth_information = with_depth_information
 
         # Get normalization parameters for encoder/estimator inputs
         self.register_buffer(
@@ -97,6 +103,9 @@ class LiveSAL(nn.Module):
                 fusion_size=last_feature_size,
                 n_iterations=n_iterations,
                 dropout_rate=self.dropout_rate,
+                with_edge_features=with_graph_edge_features,
+                with_positional_embeddings=with_graph_positional_embeddings,
+                with_directional_kernels=with_graph_directional_kernels,
             )
 
         self.temporal_layers = nn.ModuleList(
