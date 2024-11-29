@@ -76,12 +76,6 @@ class DepthDecoder(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        # Final convolution to get to single channel
-        self.final_conv = nn.Sequential(
-            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1, bias=True),
-            nn.Sigmoid(),
-        )
-
     def forward(
         self, x: torch.Tensor, skip_features: list[torch.Tensor]
     ) -> torch.Tensor:
@@ -100,6 +94,5 @@ class DepthDecoder(nn.Module):
 
         # Final upsampling
         x = self.up3(x)
-        x = self.final_conv(x)
 
         return x

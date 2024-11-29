@@ -14,25 +14,25 @@ from src.config import SEQUENCE_LENGTH, IMAGE_SIZE
 class LiveSAL(nn.Module):
     def __init__(
         self,
+        freeze_encoder: bool,
         hidden_channels: int,
         neighbor_radius: int,
         n_iterations: int,
-        with_graph_processing: bool,
-        freeze_encoder: bool,
         dropout_rate: float,
+        with_graph_processing: bool,
         with_graph_edge_features: bool,
         with_graph_positional_embeddings: bool,
         with_graph_directional_kernels: bool,
         with_depth_information: bool,
-    ):
+    ) -> None:
         super(LiveSAL, self).__init__()
 
+        self.freeze_encoder = freeze_encoder
         self.hidden_channels = hidden_channels
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
-        self.with_graph_processing = with_graph_processing
-        self.freeze_encoder = freeze_encoder
         self.dropout_rate = dropout_rate
+        self.with_graph_processing = with_graph_processing
         self.with_graph_edge_features = with_graph_edge_features
         self.with_graph_positional_embeddings = with_graph_positional_embeddings
         self.with_graph_directional_kernels = with_graph_directional_kernels
@@ -199,11 +199,27 @@ class LiveSAL(nn.Module):
 
         self.sigmoid = nn.Sigmoid()
 
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
     def _normalize_input(
-        self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
+        self, 
+        x: torch.Tensor, 
+        mean: torch.Tensor, 
+        std: torch.Tensor,
+        eps: float = 1e-6,
     ) -> torch.Tensor:
         x = x.clone()
-        normalized_x = ((x / 255.0) - mean) / std
+        normalized_x = ((x / 255.0) - mean) / (std + eps)
 
         return normalized_x
 

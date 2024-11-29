@@ -1,6 +1,7 @@
 import random
 import torch
 import numpy as np
+import lightning.pytorch as pl
 
 
 def set_seed(seed: int) -> None:
@@ -10,9 +11,4 @@ def set_seed(seed: int) -> None:
     Args:
         seed (int): The seed to use
     """
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
+    pl.seed_everything(seed, workers=True)

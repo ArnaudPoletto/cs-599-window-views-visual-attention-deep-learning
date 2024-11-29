@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Metrics():
+class Metrics:
     def __init__(self, eps: float = 1e-7):
         super(Metrics, self).__init__()
         self.eps = eps
@@ -20,7 +20,7 @@ class Metrics():
             saliency_map.sum(dim=(-2, -1), keepdim=True) + self.eps
         )
         return normalized
-    
+
     def kldiv(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
@@ -30,18 +30,18 @@ class Metrics():
 
         # Apply softmax to both predictions and targets
         pred = torch.log_softmax(pred, dim=1)
-        target = torch.log_softmax(target, dim=1)
+        target = torch.softmax(target, dim=1)
 
         # Calculate KL divergence
         kl = F.kl_div(
-            pred, 
-            target, 
-            reduction='batchmean', 
-            log_target=True
+            pred,
+            target,
+            reduction="batchmean",
+            log_target=False,
         )
 
         return kl
-    
+
     def cc(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
@@ -54,55 +54,71 @@ class Metrics():
         target_centered = target - target_mean
 
         # Calculate correlation
-        numerator = (pred_centered * target_centered).sum(dim=(-2, -1))
-        denominator = torch.sqrt(
-            (pred_centered**2).sum(dim=(-2, -1))
-            * (target_centered**2).sum(dim=(-2, -1))
-            + self.eps
+        covariance = (pred_centered * target_centered).sum(dim=(-2, -1))
+        pred_variance = torch.sqrt((pred_centered**2).sum(dim=(-2, -1)))
+        target_variance = torch.sqrt((target_centered**2).sum(dim=(-2, -1)))
+        correlation_coefficient = covariance / (
+            pred_variance * target_variance + self.eps
         )
 
-        return (numerator / denominator).mean()
+        return correlation_coefficient.mean()
 
     def auc(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
-        # Flatten predictions and targets
-        pred_flat = pred.view(-1)
-        target_flat = target.view(-1)
+        aucs = []
+        batch_size = pred.shape[0]
+        for i in range(batch_size):
+            pred_i = pred[i].flatten()
+            target_i = target[i].flatten()
 
-        # Sort predictions and corresponding targets
-        sorted_indices = torch.argsort(pred_flat, descending=True)
-        sorted_target = target_flat[sorted_indices]
+            if torch.unique(target_i).numel() == 1:
+                continue
 
-        # Calculate TPR and FPR
-        tp = torch.cumsum(sorted_target, dim=0)
-        fp = torch.cumsum(1 - sorted_target, dim=0)
+            # Sort predictions and corresponding targets
+            sorted_indices = torch.argsort(pred_i, descending=True)
+            sorted_target = target_i[sorted_indices]
 
-        # Calculate rates
-        total_positives = target_flat.sum()
-        total_negatives = len(target_flat) - total_positives
-        tpr = tp / (total_positives + self.eps)
-        fpr = fp / (total_negatives + self.eps)
+            # Threshold target
+            sorted_target_binary = (sorted_target > 0.5).float()
 
-        # Calculate AUC using trapezoidal rule
-        width = fpr[1:] - fpr[:-1]
-        height = (tpr[1:] + tpr[:-1]) / 2
-        auc_score = torch.sum(width * height)
+            # Compute true positive rates and false positive rates
+            tp = torch.cumsum(sorted_target_binary, dim=0)
+            fp = torch.cumsum(1 - sorted_target_binary, dim=0)
 
-        return auc_score
+            total_positives = torch.sum(sorted_target_binary)
+            total_negatives = torch.sum(1 - sorted_target_binary)
+
+            tpr = tp / (total_positives + self.eps)
+            fpr = fp / (total_negatives + self.eps)
+
+            # Compute AUC using trapezoidal rule
+            width = fpr[1:] - fpr[:-1]
+            height = (tpr[1:] + tpr[:-1]) / 2
+            auc = torch.sum(width * height)
+
+            aucs.append(auc)
+
+        if aucs:
+            return torch.mean(torch.stack(aucs))
+        else:
+            return torch.tensor(0.0)
 
     def nss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
         # Normalize prediction to have zero mean and unit standard deviation
-        pred_normalized = (pred - pred.mean(dim=(-2, -1), keepdim=True)) / (
-            pred.std(dim=(-2, -1), keepdim=True) + self.eps
-        )
+        pred_mean = pred.mean(dim=(-2, -1), keepdim=True)
+        pred_std = pred.std(dim=(-2, -1), keepdim=True)
+        pred_normalized = (pred - pred_mean) / (pred_std + self.eps)
+
+        # Calculate sum of saliency map values at fixation locations
+        pred_target_sum = (pred_normalized * target).sum(dim=(-2, -1))
+        target_sum = target.sum(dim=(-2, -1))
 
         # Calculate NSS score
-        nss_score = (pred_normalized * target).sum(dim=(-2, -1)) / (
-            target.sum(dim=(-2, -1)) + self.eps
-        )
+        nss_score = pred_target_sum / (target_sum + self.eps)
+
         return nss_score.mean()
 
     def sim(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -119,23 +135,30 @@ class Metrics():
     def information_gain(
         self, pred: torch.Tensor, target: torch.Tensor, center_bias_prior: torch.Tensor
     ) -> torch.Tensor:
-        """Calculate Information Gain relative to center bias prior."""
         pred, target = self._reshape_4d(pred, target)
-        
+
         center_bias_prior = center_bias_prior.unsqueeze(0).unsqueeze(0)
-        center_bias_prior = F.interpolate(center_bias_prior, size=pred.shape[-2:], mode='bilinear', align_corners=False)
+        center_bias_prior = F.interpolate(
+            center_bias_prior,
+            size=pred.shape[-2:],
+            mode="bilinear",
+            align_corners=False,
+        )
 
         # Normalize predictions and center bias prior
         pred = self._normalize_map(pred)
         center_bias_prior = self._normalize_map(center_bias_prior)
 
         # Calculate log-likelihood
-        pred_ll = torch.log2(pred + self.eps) * target
-        prior_ll = torch.log2(center_bias_prior + self.eps) * target
+        pred_log_likelihood = torch.log2(pred + self.eps) * target
+        prior_log_likelihood = torch.log2(center_bias_prior + self.eps) * target
 
         # Calculate information gain
-        ig = (pred_ll - prior_ll).sum(dim=(-2, -1)) / target.sum(dim=(-2, -1))
-        return ig.mean()
+        information_gain = (pred_log_likelihood - prior_log_likelihood).sum(
+            dim=(-2, -1)
+        ) / target.sum(dim=(-2, -1))
+
+        return information_gain.mean()
 
     def get_metrics(
         self,
@@ -143,7 +166,6 @@ class Metrics():
         target: torch.Tensor,
         center_bias_prior: torch.Tensor = None,
     ) -> dict:
-        """Calculate all metrics at once."""
         metrics = {
             "kldiv": self.kldiv(pred, target),
             "cc": self.cc(pred, target),

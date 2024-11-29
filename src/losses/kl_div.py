@@ -27,9 +27,9 @@ class KLDivLoss(nn.Module):
 
         # Prepare predictions and targets
         pred = torch.log_softmax(pred / self.temperature, dim=1)
-        target = torch.log_softmax(target, dim=1)
+        target = torch.softmax(target, dim=1)
 
         # Calculate KL divergence
-        loss = nn.KLDivLoss(reduction="batchmean", log_target=True)(pred, target)
+        loss = nn.KLDivLoss(reduction="batchmean", log_target=False)(pred, target)
 
         return loss * (self.temperature**2)

@@ -47,6 +47,7 @@ class GraphProcessor(nn.Module):
         self.spatial_dropout = nn.Dropout2d(dropout_rate)
         self.temporal_dropout = nn.Dropout3d(dropout_rate)
 
+
         # Get intra-attention components
         self.intra_key_conv = nn.Conv2d(
             in_channels=hidden_channels,
@@ -214,6 +215,7 @@ class GraphProcessor(nn.Module):
         value = self.intra_value_conv(x).view(batch_size, channels, -1)
 
         attention = torch.bmm(query.transpose(1, 2), key) * self.scale
+        attention = attention - attention.max(dim=-1, keepdim=True)[0]
         attention = torch.softmax(attention, dim=-1)
 
         output = torch.bmm(attention, value.transpose(1, 2))
@@ -297,6 +299,7 @@ class GraphProcessor(nn.Module):
             value = inter_value_conv(y).view(batch_size, channels, -1)
 
             attention = torch.bmm(query.transpose(1, 2), key) * self.scale
+            attention = attention - attention.max(dim=-1, keepdim=True)[0]
             attention = torch.softmax(attention, dim=-1)
 
             message = torch.bmm(attention, value.transpose(1, 2)).transpose(1, 2)
