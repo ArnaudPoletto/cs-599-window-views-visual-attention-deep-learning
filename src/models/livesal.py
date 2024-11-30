@@ -26,6 +26,7 @@ class LiveSAL(nn.Module):
         with_graph_positional_embeddings: bool,
         with_graph_directional_kernels: bool,
         with_depth_information: bool,
+        with_global_output: bool,
     ) -> None:
         super(LiveSAL, self).__init__()
 
@@ -41,6 +42,8 @@ class LiveSAL(nn.Module):
         self.with_graph_positional_embeddings = with_graph_positional_embeddings
         self.with_graph_directional_kernels = with_graph_directional_kernels
         self.with_depth_information = with_depth_information
+        self.with_global_output = with_global_output
+        
 
         # Get normalization parameters for encoder/estimator inputs
         self.register_buffer(
@@ -181,25 +184,26 @@ class LiveSAL(nn.Module):
             ),
         )
 
-        self.final_global_layer = nn.Sequential(
-            nn.Conv2d(
-                in_channels=SEQUENCE_LENGTH,
-                out_channels=hidden_channels,
-                kernel_size=3,
-                padding=1,
-                bias=False,
-            ),
-            nn.BatchNorm2d(hidden_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=1,
-                kernel_size=3,
-                padding=1,
-                bias=True,
-            ),
-            nn.Sigmoid(),
-        )
+        if with_global_output:
+            self.final_global_layer = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=SEQUENCE_LENGTH,
+                    out_channels=hidden_channels,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False,
+                ),
+                nn.BatchNorm2d(hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(
+                    in_channels=hidden_channels,
+                    out_channels=1,
+                    kernel_size=3,
+                    padding=1,
+                    bias=True,
+                ),
+                nn.Sigmoid(),
+            )
 
         self.sigmoid = nn.Sigmoid()
 
@@ -375,15 +379,6 @@ class LiveSAL(nn.Module):
 
         return temporal_features
 
-    def _get_global_output(
-        self,
-        temporal_features: torch.Tensor,
-    ) -> torch.Tensor:
-        global_output = self.final_global_layer(temporal_features).squeeze(1)
-
-        return global_output
-
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() not in [4, 5]:
             raise ValueError(
@@ -438,8 +433,10 @@ class LiveSAL(nn.Module):
         )
         temporal_output = self.sigmoid(temporal_features)
 
-        global_output = self._get_global_output(
-            temporal_features=temporal_features,
-        )
+        # Get global output if required
+        if self.with_global_output:
+            global_output = self.final_global_layer(temporal_features).squeeze(1)
+        else:
+            global_output = None
 
         return temporal_output, global_output

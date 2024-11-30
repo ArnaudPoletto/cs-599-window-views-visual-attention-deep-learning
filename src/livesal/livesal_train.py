@@ -150,6 +150,7 @@ def main() -> None:
     with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
     with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
     with_depth_information = bool(config["with_depth_information"])
+    with_global_output = bool(config["with_global_output"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
@@ -176,6 +177,7 @@ def main() -> None:
         with_graph_positional_embeddings=with_graph_positional_embeddings,
         with_graph_directional_kernels=with_graph_directional_kernels,
         with_depth_information=with_depth_information,
+        with_global_output=with_global_output,
     )
     lightning_model = LightningModel(
         model=model,

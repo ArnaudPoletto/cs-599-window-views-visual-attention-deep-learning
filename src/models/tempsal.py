@@ -26,6 +26,7 @@ class TempSAL(nn.Module):
         self,
         freeze_encoder: bool,
         hidden_channels_list: List[int],
+        with_global_output: bool = True,
     ) -> None:
         """
         Initialize the TempSAL model.
@@ -38,6 +39,7 @@ class TempSAL(nn.Module):
 
         self.freeze_encoder = freeze_encoder
         self.hidden_channels_list = hidden_channels_list
+        self.with_global_output = with_global_output
 
         # Get normalization parameters for encoder inputs
         self.register_buffer(
@@ -61,16 +63,17 @@ class TempSAL(nn.Module):
             features_sizes=self.image_encoder.feature_sizes,
             output_channels=SEQUENCE_LENGTH,
         )
-        self.global_decoder = ImageDecoder(
-            features_channels_list=self.image_encoder.feature_channels_list,
-            hidden_channels_list=hidden_channels_list,
-            features_sizes=self.image_encoder.feature_sizes,
-            output_channels=1,
-        )
-        self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
-            hidden_channels_list=hidden_channels_list,
-            feature_channels_list=self.image_encoder.feature_channels_list,
-        )
+        if with_global_output:
+            self.global_decoder = ImageDecoder(
+                features_channels_list=self.image_encoder.feature_channels_list,
+                hidden_channels_list=hidden_channels_list,
+                features_sizes=self.image_encoder.feature_sizes,
+                output_channels=1,
+            )
+            self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
+                hidden_channels_list=hidden_channels_list,
+                feature_channels_list=self.image_encoder.feature_channels_list,
+            )
 
         self.initialize_weights()
 
@@ -112,16 +115,17 @@ class TempSAL(nn.Module):
 
         # Decode the temporal and global features
         temporal_features = self.temporal_decoder(encoded_features_list)
-        global_features = self.global_decoder(encoded_features_list)
-
-        # The temporal output is the temporal features
         temporal_output = temporal_features
 
-        # The global output is the output of the spatio-temporal mixing module
-        global_output = self.spatio_temporal_mixing_module(
-            encoded_features_list=encoded_features_list,
-            temporal_features=temporal_features,
-            global_features=global_features,
-        ).squeeze(1)
+        # Estimate global saliency map using spatio-temporal mixing module if required
+        if self.with_global_output:
+            global_features = self.global_decoder(encoded_features_list)
+            global_output = self.spatio_temporal_mixing_module(
+                encoded_features_list=encoded_features_list,
+                temporal_features=temporal_features,
+                global_features=global_features,
+            ).squeeze(1)
+        else: 
+            global_output = None
 
         return temporal_output, global_output
