@@ -39,6 +39,18 @@ class TempSAL(nn.Module):
         self.freeze_encoder = freeze_encoder
         self.hidden_channels_list = hidden_channels_list
 
+        # Get normalization parameters for encoder inputs
+        self.register_buffer(
+            "image_mean",
+            torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "image_std",
+            torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
+            persistent=False,
+        )
+
         self.image_encoder = ImageEncoder(
             freeze=freeze_encoder,
         )
@@ -72,6 +84,18 @@ class TempSAL(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
+    def _normalize_input(
+        self, 
+        x: torch.Tensor, 
+        mean: torch.Tensor, 
+        std: torch.Tensor,
+        eps: float = 1e-6,
+    ) -> torch.Tensor:
+        x = x.clone()
+        normalized_x = (x - mean) / (std + eps)
+
+        return normalized_x
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the TempSAL model.
@@ -83,7 +107,8 @@ class TempSAL(nn.Module):
             torch.Tensor: The temporal and global saliency maps.
         """
         # Encode the input image
-        encoded_features_list = self.image_encoder(x)
+        x_image = self._normalize_input(x, self.image_mean, self.image_std)
+        encoded_features_list = self.image_encoder(x_image)
 
         # Decode the temporal and global features
         temporal_features = self.temporal_decoder(encoded_features_list)

@@ -8,7 +8,6 @@ import time
 import torch
 import argparse
 import multiprocessing
-from typing import Any
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
@@ -18,6 +17,7 @@ from src.utils.random import set_seed
 from src.models.livesal import LiveSAL
 from src.utils.parser import get_config
 from src.utils.file import get_paths_recursive
+from src.datasets.dhf1k_dataset import DHF1KDataModule
 from src.datasets.salicon_dataset import SaliconDataModule
 from src.lightning_models.lightning_model import LightningModel
 from src.config import (
@@ -25,6 +25,7 @@ from src.config import (
     N_WORKERS,
     MODELS_PATH,
     CONFIG_PATH,
+    PROCESSED_DHF1K_PATH,
     PROCESSED_SALICON_PATH,
 )
 
@@ -36,7 +37,7 @@ def _get_data_module(
     val_split: float,
     test_split: float,
     with_transforms: bool,
-) -> Any:
+) -> SaliconDataModule | DHF1KDataModule:
     """
     Get the data module for the dataset.
 
@@ -56,6 +57,20 @@ def _get_data_module(
             folder_path=PROCESSED_SALICON_PATH, match_pattern="*", path_type="d"
         )
         data_module = SaliconDataModule(
+            sample_folder_paths=sample_folder_paths,
+            batch_size=batch_size,
+            train_split=train_split,
+            val_split=val_split,
+            test_split=test_split,
+            with_transforms=with_transforms,
+            n_workers=N_WORKERS,
+            seed=SEED,
+        )
+    elif dataset == "dhf1k":
+        sample_folder_paths = get_paths_recursive(
+            folder_path=PROCESSED_DHF1K_PATH, match_pattern="*", path_type="d"
+        )
+        data_module = DHF1KDataModule(
             sample_folder_paths=sample_folder_paths,
             batch_size=batch_size,
             train_split=train_split,
@@ -129,6 +144,7 @@ def main() -> None:
     n_iterations = int(config["n_iterations"])
     with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
+    depth_integration = str(config["depth_integration"])
     dropout_rate = float(config["dropout_rate"])
     with_graph_edge_features = bool(config["with_graph_edge_features"])
     with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
@@ -153,6 +169,7 @@ def main() -> None:
         hidden_channels=hidden_channels,
         neighbor_radius=neighbor_radius,
         n_iterations=n_iterations,
+        depth_integration=depth_integration,
         dropout_rate=dropout_rate,
         with_graph_processing=with_graph_processing,
         with_graph_edge_features=with_graph_edge_features,
@@ -169,15 +186,16 @@ def main() -> None:
     )
 
     # Get trainer and train
+    wandb_name = f"{time.strftime('%Y%m%d-%H%M%S')}_livesal"
     wandb_logger = WandbLogger(
         project="thesis",
-        name=f"{time.strftime('%Y%m%d-%H%M%S')}_livesal",
+        name=wandb_name,
         config=config,
     )
 
     if save_model:
         checkpoint_callback = ModelCheckpoint(
-            dirpath=f"{MODELS_PATH}/livesal",
+            dirpath=f"{MODELS_PATH}/livesal/{wandb_name}",
             filename="{epoch}-{val_loss:.2f}",
             save_top_k=3,
             monitor="val_loss",
@@ -192,7 +210,7 @@ def main() -> None:
         accelerator="gpu",
         devices=-1,
         num_nodes=n_nodes,
-        precision=32, # TODO: Change to 16-mixed
+        precision=32,
         strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
         val_check_interval=evaluation_steps,
         logger=wandb_logger,

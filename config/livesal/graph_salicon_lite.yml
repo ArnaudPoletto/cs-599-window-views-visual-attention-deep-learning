@@ -13,6 +13,7 @@ freeze_encoder: True
 hidden_channels: 64
 neighbor_radius: 1
 n_iterations: 3
+depth_integration: "late" #"early", "late", "both"
 dropout_rate: 0.0
 with_graph_processing: True
 with_graph_edge_features: True

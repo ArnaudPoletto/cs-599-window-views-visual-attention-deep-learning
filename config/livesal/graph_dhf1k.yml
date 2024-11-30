@@ -8,12 +8,13 @@ splits: [0.6, 0.3, 0.1]
 save_model: True
 with_transforms: True
 
-image_n_levels: 3
+image_n_levels: 5
 freeze_encoder: True
 hidden_channels: 64
 neighbor_radius: 1
-n_iterations: 3
-dropout_rate: 0.0
+n_iterations: 5
+depth_integration: "late" #"early", "late", "both"
+dropout_rate: 0.2
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True

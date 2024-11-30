@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=livesal
+#SBATCH --job-name=livesal_salicon
 #SBATCH --output=/scratch/izar/poletto/logs/log_livesal_graph_salicon_%j.out
 #SBATCH --error=/scratch/izar/poletto/logs/log_livesal_graph_salicon_%j.err
 #SBATCH --nodes=4

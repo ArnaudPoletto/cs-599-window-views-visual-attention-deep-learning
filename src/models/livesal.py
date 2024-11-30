@@ -19,6 +19,7 @@ class LiveSAL(nn.Module):
         hidden_channels: int,
         neighbor_radius: int,
         n_iterations: int,
+        depth_integration: str,
         dropout_rate: float,
         with_graph_processing: bool,
         with_graph_edge_features: bool,
@@ -33,15 +34,13 @@ class LiveSAL(nn.Module):
         self.hidden_channels = hidden_channels
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
+        self.depth_integration = depth_integration
         self.dropout_rate = dropout_rate
         self.with_graph_processing = with_graph_processing
         self.with_graph_edge_features = with_graph_edge_features
         self.with_graph_positional_embeddings = with_graph_positional_embeddings
         self.with_graph_directional_kernels = with_graph_directional_kernels
         self.with_depth_information = with_depth_information
-
-        depth_integration = "both" #early, late, both
-        self.depth_integration = depth_integration
 
         # Get normalization parameters for encoder/estimator inputs
         self.register_buffer(
@@ -224,7 +223,7 @@ class LiveSAL(nn.Module):
         eps: float = 1e-6,
     ) -> torch.Tensor:
         x = x.clone()
-        normalized_x = ((x / 255.0) - mean) / (std + eps)
+        normalized_x = (x - mean) / (std + eps)
 
         return normalized_x
 

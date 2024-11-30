@@ -141,15 +141,16 @@ def main() -> None:
     )
 
     # Get trainer and train
+    wandb_name = f"{time.strftime('%Y%m%d-%H%M%S')}_tempsal"
     wandb_logger = WandbLogger(
         project="thesis",
-        name=f"{time.strftime('%Y%m%d-%H%M%S')}_tempsal",
+        name=wandb_name,
         config=config,
     )
 
     if save_model:
         checkpoint_callback = ModelCheckpoint(
-            dirpath=f"{MODELS_PATH}/tempsal",
+            dirpath=f"{MODELS_PATH}/tempsal/{wandb_name}",
             filename="{epoch}-{val_loss:.2f}",
             save_top_k=3,
             monitor="val_loss",

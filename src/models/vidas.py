@@ -4,6 +4,7 @@ import torch.nn as nn
 from typing import Tuple, List
 
 from src.models.depth_estimator import DepthEstimator
+from src.config import SEQUENCE_LENGTH, IMAGE_SIZE
 
 
 class DSAM(nn.Module):
@@ -78,7 +79,6 @@ class ViDaSEncoder(nn.Module):
     def __init__(
         self,
         input_channels: int,
-        input_shape: Tuple[int, int, int],
         hidden_channels_list: List[int],
         kernel_sizes: List[int],
         use_max_poolings: List[bool],
@@ -95,7 +95,6 @@ class ViDaSEncoder(nn.Module):
             )
 
         self.input_channels = input_channels
-        self.input_shape = input_shape
         self.hidden_channels_list = hidden_channels_list
         self.kernel_sizes = kernel_sizes
         self.use_max_poolings = use_max_poolings
@@ -174,7 +173,7 @@ class ViDaSEncoder(nn.Module):
 
     def get_saliency_map_shapes(self) -> List[Tuple[int, int]]:
         saliency_map_shapes = [
-            math.ceil(self.input_shape[1] / 2 ** (i + 1))
+            math.ceil(IMAGE_SIZE / 2 ** (i + 1))
             for i in range(len(self.hidden_channels_list))
         ]
         saliency_map_shapes = [(s, s) for s in saliency_map_shapes]
@@ -186,9 +185,9 @@ class ViDaSEncoder(nn.Module):
             raise ValueError(
                 f"❌ Input tensor has {x.shape[1]} channels, expected {self.input_channels}."
             )
-        if x.shape[2:] != self.input_shape:
+        if x.shape[2:] != (SEQUENCE_LENGTH, IMAGE_SIZE, IMAGE_SIZE):
             raise ValueError(
-                f"❌ Input tensor has shape {x.shape[2:]}, expected {self.input_shape}."
+                f"❌ Input tensor has shape {x.shape[2:]}, expected {(SEQUENCE_LENGTH, IMAGE_SIZE, IMAGE_SIZE)}."
             )
 
         saliency_maps_list = []
@@ -246,7 +245,6 @@ class ViDaS(nn.Module):
     def __init__(
         self,
         input_channels: int,
-        input_shape: Tuple[int, int, int],
         hidden_channels_list: List[int],
         kernel_sizes: List[int],
         use_max_poolings: List[bool],
@@ -257,7 +255,6 @@ class ViDaS(nn.Module):
         super(ViDaS, self).__init__()
 
         self.input_channels = input_channels
-        self.input_shape = input_shape
         self.hidden_channels_list = hidden_channels_list
         self.kernel_sizes = kernel_sizes
         self.use_max_poolings = use_max_poolings
@@ -267,7 +264,6 @@ class ViDaS(nn.Module):
 
         self.image_encoder = ViDaSEncoder(
             input_channels=input_channels,
-            input_shape=input_shape,
             hidden_channels_list=hidden_channels_list,
             kernel_sizes=kernel_sizes,
             use_max_poolings=use_max_poolings,
@@ -280,7 +276,7 @@ class ViDaS(nn.Module):
             saliency_out_channels=saliency_out_channels,
         )
         self.image_upsample = nn.Upsample(
-            size=input_shape[1:], mode="bilinear", align_corners=False
+            size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
 
         self.register_buffer(
@@ -298,7 +294,6 @@ class ViDaS(nn.Module):
             self.depth_estimator = DepthEstimator(freeze=True)
             self.depth_encoder = ViDaSEncoder(
                 input_channels=1,
-                input_shape=input_shape,
                 hidden_channels_list=hidden_channels_list,
                 kernel_sizes=kernel_sizes,
                 use_max_poolings=use_max_poolings,
@@ -311,7 +306,7 @@ class ViDaS(nn.Module):
                 saliency_out_channels=saliency_out_channels,
             )
             self.depth_upsample = nn.Upsample(
-                size=input_shape[1:], mode="bilinear", align_corners=False
+                size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
             )
 
             self.register_buffer(
@@ -350,12 +345,14 @@ class ViDaS(nn.Module):
         )
 
     def _normalize_input(
-        self, x: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
+        self, 
+        x: torch.Tensor, 
+        mean: torch.Tensor, 
+        std: torch.Tensor,
+        eps: float = 1e-6,
     ) -> torch.Tensor:
-        if x.max() > 1.0:
-            x = x.float() / 255.0
-
-        normalized_x = (x - mean) / std
+        x = x.clone()
+        normalized_x = (x - mean) / (std + eps)
 
         return normalized_x
 
@@ -388,4 +385,4 @@ class ViDaS(nn.Module):
             decoded_maps = image_decoded_maps
         global_output = self.final_layer(decoded_maps).squeeze(1)
 
-        return global_output
+        return None, global_output

@@ -4,12 +4,10 @@ from pathlib import Path
 GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
-import cv2
-import torch
 import random
+import torch
 import numpy as np
 from PIL import Image
-import albumentations as A
 import lightning.pytorch as pl
 from torchvision import transforms
 from typing import List, Tuple, Optional
@@ -18,6 +16,7 @@ from torchvision.transforms import functional as TF
 
 from src.utils.random import set_seed
 from src.utils.file import get_paths_recursive
+from src.config import IMAGE_SIZE
 
 
 class SaliconDataset(Dataset):
@@ -33,36 +32,63 @@ class SaliconDataset(Dataset):
         self.input_transforms = transforms.Compose([
             transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
             transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
-        ]) if with_transforms else None
+        ])
 
     def __len__(self) -> int:
         return len(self.sample_folder_paths)
 
-    def _apply_transforms(self, frame: Image.Image, ground_truths: List[Image.Image]) -> Tuple[Image.Image, List[Image.Image]]:
-        # TODO: remove the hard-coded values
-        frame = TF.resize(frame, (331, 331))
-        ground_truths = [TF.resize(gt, (331, 331)) for gt in ground_truths]
+    def _apply_transforms(
+        self, frame: np.ndarray, ground_truths: List[np.ndarray]
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        # Resize frames and ground truths
+        frame = TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
+        ground_truths = [
+            TF.resize(gt, (IMAGE_SIZE, IMAGE_SIZE)) for gt in ground_truths
+        ]
 
         if self.with_transforms:
-            # Apply random horizontal flip
-            if random.random() > 0.5:
+            do_flip = random.random() > 0.5
+            do_rotate = random.random() > 0.5
+            angle = random.uniform(-15, 15) if do_rotate else 0
+            brightness_factor = random.uniform(0.9, 1.1)
+            contrast_factor = random.uniform(0.9, 1.1)
+            saturation_factor = random.uniform(0.9, 1.1)
+            hue_factor = random.uniform(-0.05, 0.05)
+            sigma = random.uniform(0.1, 0.5)
+
+            # Apply flip
+            if do_flip:
                 frame = TF.hflip(frame)
-                ground_truths = [TF.hflip(gt) for gt in ground_truths]
-            
-            # Apply random rotation
-            if random.random() > 0.5:
-                angle = random.uniform(-15, 15)
+                transformed_ground_truths = []
+                for ground_truth in ground_truths:
+                    ground_truth = TF.hflip(ground_truth)
+                    transformed_ground_truths.append(ground_truth)
+                ground_truths = transformed_ground_truths
+
+            # Apply rotation
+            if do_rotate:
                 frame = TF.rotate(frame, angle, fill=0)
-                ground_truths = [TF.rotate(gt, angle, fill=0) for gt in ground_truths]
-            
-            # Apply color transforms only to input frame
-            if self.input_transforms:
-                frame = self.input_transforms(frame)
+                transformed_ground_truths = []
+                for ground_truth in ground_truths:
+                    ground_truth = TF.rotate(ground_truth, angle, fill=0)
+                    transformed_ground_truths.append(ground_truth)
+                ground_truths = transformed_ground_truths
+
+            # Apply color transforms
+            frame = TF.adjust_brightness(frame, brightness_factor)
+            frame = TF.adjust_contrast(frame, contrast_factor)
+            frame = TF.adjust_saturation(frame, saturation_factor)
+            frame = TF.adjust_hue(frame, hue_factor)
+
+            # Apply Gaussian blur
+            frame = TF.gaussian_blur(frame, kernel_size=3, sigma=sigma)
 
         return frame, ground_truths
 
-    def __getitem__(self, index: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, np.ndarray, np.ndarray]:
         sample_folder_path = self.sample_folder_paths[index]
+
+        # Get frames and ground truths and apply transforms
         frame_file_path = f"{sample_folder_path}/frame.jpg"
         output_file_paths = get_paths_recursive(
             sample_folder_path, match_pattern="ground_truth_*.jpg", path_type="f"
@@ -74,16 +100,17 @@ class SaliconDataset(Dataset):
             ]
         frame, ground_truths = self._apply_transforms(frame, ground_truths)
 
-        # Convert to numpy arrays
-        frame = np.array(frame).transpose(2, 0, 1).astype(np.float32)
-        ground_truths = np.array(ground_truths).astype(np.float32) / 255.0
+        # Convert to torch tensors
+        frame = TF.to_tensor(frame).float()
+        ground_truths = [TF.to_tensor(ground_truth).float() for ground_truth in ground_truths]
+        ground_truths = torch.stack(ground_truths, axis=0).squeeze(1)
 
         # Get global ground truth
-        global_ground_truth = np.mean(ground_truths, axis=0)
+        global_ground_truth = torch.mean(ground_truths, axis=0)
         min_val = global_ground_truth.min()
         max_val = global_ground_truth.max()
         if min_val == max_val:
-            global_ground_truth = np.zeros_like(global_ground_truth)
+            global_ground_truth = torch.zeros_like(global_ground_truth)
         else:
             global_ground_truth = (global_ground_truth - min_val) / (max_val - min_val)
 
