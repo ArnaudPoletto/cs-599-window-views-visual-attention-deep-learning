@@ -144,6 +144,7 @@ def main() -> None:
     n_iterations = int(config["n_iterations"])
     with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
+    freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     depth_integration = str(config["depth_integration"])
     dropout_rate = float(config["dropout_rate"])
     with_graph_edge_features = bool(config["with_graph_edge_features"])
@@ -167,6 +168,7 @@ def main() -> None:
     model = LiveSAL(
         image_n_levels=image_n_levels,
         freeze_encoder=freeze_encoder,
+        freeze_temporal_pipeline=freeze_temporal_pipeline,
         hidden_channels=hidden_channels,
         neighbor_radius=neighbor_radius,
         n_iterations=n_iterations,

@@ -22,15 +22,17 @@ class TempSAL(nn.Module):
     Returns:
         torch.Tensor: The temporal and global saliency maps.
     """
+
     def __init__(
         self,
         freeze_encoder: bool,
+        freeze_temporal_pipeline: bool,
         hidden_channels_list: List[int],
-        with_global_output: bool = True,
+        with_global_output: bool,
     ) -> None:
         """
         Initialize the TempSAL model.
-        
+
         Args:
             freeze_encoder (bool): Whether to freeze the encoder's parameters.
             hidden_channels_list (List[int]): The number of hidden channels to use in the decoders.
@@ -38,6 +40,7 @@ class TempSAL(nn.Module):
         super(TempSAL, self).__init__()
 
         self.freeze_encoder = freeze_encoder
+        self.freeze_temporal_pipeline = freeze_temporal_pipeline
         self.hidden_channels_list = hidden_channels_list
         self.with_global_output = with_global_output
 
@@ -54,7 +57,7 @@ class TempSAL(nn.Module):
         )
 
         self.image_encoder = ImageEncoder(
-            freeze=freeze_encoder,
+            freeze=freeze_encoder or freeze_temporal_pipeline,
         )
 
         self.temporal_decoder = ImageDecoder(
@@ -75,6 +78,10 @@ class TempSAL(nn.Module):
                 feature_channels_list=self.image_encoder.feature_channels_list,
             )
 
+        if freeze_temporal_pipeline:
+            for param in self.temporal_decoder.parameters():
+                param.requires_grad = False
+
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -88,9 +95,9 @@ class TempSAL(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def _normalize_input(
-        self, 
-        x: torch.Tensor, 
-        mean: torch.Tensor, 
+        self,
+        x: torch.Tensor,
+        mean: torch.Tensor,
         std: torch.Tensor,
         eps: float = 1e-6,
     ) -> torch.Tensor:
@@ -102,10 +109,10 @@ class TempSAL(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the TempSAL model.
-        
+
         Args:
             x (torch.Tensor): The input image.
-            
+
         Returns:
             torch.Tensor: The temporal and global saliency maps.
         """
@@ -125,7 +132,7 @@ class TempSAL(nn.Module):
                 temporal_features=temporal_features,
                 global_features=global_features,
             ).squeeze(1)
-        else: 
+        else:
             global_output = None
 
         return temporal_output, global_output

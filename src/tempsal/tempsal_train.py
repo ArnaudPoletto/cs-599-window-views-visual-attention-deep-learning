@@ -115,6 +115,7 @@ def main() -> None:
     save_model = bool(config["save_model"])
     with_transforms = bool(config["with_transforms"])
     freeze_encoder = bool(config["freeze_encoder"])
+    freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     with_global_output = bool(config["with_global_output"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
@@ -131,6 +132,7 @@ def main() -> None:
     # Get model
     model = TempSAL(
         freeze_encoder=freeze_encoder,
+        freeze_temporal_pipeline=freeze_temporal_pipeline,
         hidden_channels_list=hidden_channels_list,
         with_global_output=with_global_output,
     )
