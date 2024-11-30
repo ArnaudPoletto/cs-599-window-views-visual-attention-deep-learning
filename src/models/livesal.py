@@ -14,6 +14,7 @@ from src.config import SEQUENCE_LENGTH, IMAGE_SIZE
 class LiveSAL(nn.Module):
     def __init__(
         self,
+        image_n_levels: int,
         freeze_encoder: bool,
         hidden_channels: int,
         neighbor_radius: int,
@@ -27,6 +28,7 @@ class LiveSAL(nn.Module):
     ) -> None:
         super(LiveSAL, self).__init__()
 
+        self.image_n_levels = image_n_levels
         self.freeze_encoder = freeze_encoder
         self.hidden_channels = hidden_channels
         self.neighbor_radius = neighbor_radius
@@ -37,6 +39,9 @@ class LiveSAL(nn.Module):
         self.with_graph_positional_embeddings = with_graph_positional_embeddings
         self.with_graph_directional_kernels = with_graph_directional_kernels
         self.with_depth_information = with_depth_information
+
+        depth_integration = "both" #early, late, both
+        self.depth_integration = depth_integration
 
         # Get normalization parameters for encoder/estimator inputs
         self.register_buffer(
@@ -61,37 +66,38 @@ class LiveSAL(nn.Module):
                 persistent=False,
             )
 
-        self.image_encoder = ImageEncoder(
-            freeze=freeze_encoder,
-        )
-        self.fusion_level = len(self.image_encoder.feature_sizes)
-
         if with_depth_information:
             self.depth_estimator = DepthEstimator(
                 freeze=freeze_encoder,
             )
-            self.depth_encoder = DepthEncoder(
-                hidden_channels=hidden_channels,
-            )
-            self.depth_graph_processor = GraphProcessor(
-                hidden_channels=hidden_channels,
-                neighbor_radius=neighbor_radius,
-                fusion_size=self.depth_encoder.features_size,
-                n_iterations=n_iterations,
-                dropout_rate=dropout_rate,
-                with_edge_features=with_graph_edge_features,
-                with_positional_embeddings=with_graph_positional_embeddings,
-                with_directional_kernels=with_graph_directional_kernels,
-            )
-            self.depth_decoder = DepthDecoder(
-                hidden_channels=hidden_channels,
-            )
+            if depth_integration in ["late", "both"]:
+                self.depth_encoder = DepthEncoder(
+                    hidden_channels=hidden_channels,
+                )
+                self.depth_graph_processor = GraphProcessor(
+                    hidden_channels=hidden_channels,
+                    neighbor_radius=neighbor_radius,
+                    fusion_size=self.depth_encoder.features_size,
+                    n_iterations=n_iterations,
+                    dropout_rate=dropout_rate,
+                    with_edge_features=with_graph_edge_features,
+                    with_positional_embeddings=with_graph_positional_embeddings,
+                    with_directional_kernels=with_graph_directional_kernels,
+                )
+                self.depth_decoder = DepthDecoder(
+                    hidden_channels=hidden_channels,
+                )
 
+        self.image_encoder = ImageEncoder(
+            freeze=freeze_encoder,
+            n_levels=image_n_levels,
+        )
+        with_early_depth_integration = with_depth_information and depth_integration in ["early", "both"]
         self.image_projection_layers = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
-                        in_channels=in_ch,
+                        in_channels=in_ch + (1 * with_early_depth_integration),
                         out_channels=max(in_ch // 2, hidden_channels),
                         kernel_size=1,
                         bias=False,
@@ -113,20 +119,19 @@ class LiveSAL(nn.Module):
             ]
         )
 
+
         if with_graph_processing:
-            self.graph_processors = nn.ModuleList([
-                GraphProcessor(
-                    hidden_channels=hidden_channels,
-                    neighbor_radius=neighbor_radius,
-                    fusion_size=feature_size,
-                    n_iterations=n_iterations,
-                    dropout_rate=self.dropout_rate,
-                    with_edge_features=with_graph_edge_features,
-                    with_positional_embeddings=with_graph_positional_embeddings,
-                    with_directional_kernels=with_graph_directional_kernels,
-                )
-                for feature_size in self.image_encoder.feature_sizes[-3:]
-            ])
+            image_last_layer_size = self.image_encoder.feature_sizes[-1]
+            self.image_graph_processor = GraphProcessor(
+                hidden_channels=hidden_channels,
+                neighbor_radius=neighbor_radius,
+                fusion_size=image_last_layer_size,
+                n_iterations=n_iterations,
+                dropout_rate=self.dropout_rate,
+                with_edge_features=with_graph_edge_features,
+                with_positional_embeddings=with_graph_positional_embeddings,
+                with_directional_kernels=with_graph_directional_kernels,
+            )
 
         self.temporal_layers = nn.ModuleList(
             [
@@ -152,11 +157,11 @@ class LiveSAL(nn.Module):
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
                 )
-                for _ in range(self.fusion_level - 1)
+                for _ in range(image_n_levels - 1)
             ]
         )
         final_temporal_layer_in_channels = hidden_channels
-        if with_depth_information:
+        if with_depth_information and depth_integration in ["late", "both"]:
             final_temporal_layer_in_channels += hidden_channels
         self.final_temporal_layer = nn.Sequential(
             nn.Conv2d(
@@ -240,13 +245,25 @@ class LiveSAL(nn.Module):
     def _get_image_projected_features_list(
         self,
         image_features_list: List[torch.Tensor],
+        depth_estimation: Optional[torch.Tensor],
         is_image: bool,
     ) -> List[torch.Tensor]:
         image_projected_features_list = []
         for image_features, image_projection_layer in zip(
             image_features_list, self.image_projection_layers
         ):
-            image_projected_features = image_projection_layer(image_features)
+            if depth_estimation is not None:
+                resized_depth_estimation = nn.functional.interpolate(
+                    depth_estimation,
+                    size=image_features.shape[-2:],
+                    mode="bilinear",
+                    align_corners=False,
+                )
+                features = torch.cat([image_features, resized_depth_estimation], dim=1)
+            else:
+                features = image_features
+
+            image_projected_features = image_projection_layer(features)
 
             if is_image:
                 image_projected_features = image_projected_features.unsqueeze(1).repeat(
@@ -279,6 +296,17 @@ class LiveSAL(nn.Module):
         graph_features = graph_features + image_features
 
         return graph_features
+    
+    def _get_depth_estimation(self, x: torch.Tensor, is_image: bool) -> torch.Tensor:
+        if not is_image:
+            batch_size, sequence_length, channels, height, width = x.shape
+            x = x.view(-1, channels, height, width)
+
+        # Normalize and get depth features
+        x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
+        depth_estimation = self.depth_estimator(x_depth)
+
+        return depth_estimation
     
     def _get_depth_encoded_features(self, x: torch.Tensor, is_image: bool) -> torch.Tensor:
         if not is_image:
@@ -338,7 +366,7 @@ class LiveSAL(nn.Module):
         decoded_features = nn.functional.interpolate(
             x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
-        if self.with_depth_information:
+        if self.with_depth_information and self.depth_integration in ["late", "both"]:
             decoded_features = torch.cat([decoded_features, depth_decoded_features], dim=1)
         decoded_features = self.final_temporal_layer(decoded_features).squeeze(1)
 
@@ -371,9 +399,15 @@ class LiveSAL(nn.Module):
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
 
+        if self.with_depth_information and self.depth_integration in ["early", "both"]:
+            depth_estimation = self._get_depth_estimation(x, is_image)
+        else:
+            depth_estimation = None
+
         # Project features and get skip features
         image_features_list = self._get_image_projected_features_list(
             image_features_list=image_features_list,
+            depth_estimation=depth_estimation,
             is_image=is_image,
         )
 
@@ -381,18 +415,10 @@ class LiveSAL(nn.Module):
         if self.with_graph_processing:
             image_features_list[-1] = self._get_graph_features(
                 image_features=image_features_list[-1],
-                graph_processor=self.graph_processors[-1],
-            )
-            image_features_list[-2] = self._get_graph_features(
-                image_features=image_features_list[-2],
-                graph_processor=self.graph_processors[-2],
-            )
-            image_features_list[-3] = self._get_graph_features(
-                image_features=image_features_list[-3],
-                graph_processor=self.graph_processors[-3],
+                graph_processor=self.image_graph_processor,
             )
 
-        if self.with_depth_information:
+        if self.with_depth_information and self.depth_integration in ["late", "both"]:
             depth_encoded_features, depth_skip_features_list = self._get_depth_encoded_features(x, is_image)
             if self.with_graph_processing:
                 depth_features = self._get_graph_features(

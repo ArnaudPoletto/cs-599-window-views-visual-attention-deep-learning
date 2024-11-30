@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from typing import List
 
-from src.config import IMAGE_SIZE, IMAGE_ENCODER_MODEL_NAME, IMAGE_ENCODER_PRETRAINED
+from src.config import IMAGE_SIZE, IMAGE_ENCODER_N_LEVELS, IMAGE_ENCODER_MODEL_NAME, IMAGE_ENCODER_PRETRAINED
 
 
 class ImageEncoder(nn.Module):
@@ -20,6 +20,7 @@ class ImageEncoder(nn.Module):
     def __init__(
         self,
         freeze: bool,
+        n_levels: int = IMAGE_ENCODER_N_LEVELS,
         model_name: str = IMAGE_ENCODER_MODEL_NAME,
         pretrained: bool = IMAGE_ENCODER_PRETRAINED,
     ) -> None:
@@ -31,11 +32,15 @@ class ImageEncoder(nn.Module):
             pretrained (bool): Whether to use a pretrained model to extract features from the image. Defaults to True.
             freeze (bool): Whether to freeze the model's parameters. Defaults to True.
         """
+        if n_levels < 1:
+            raise ValueError(f"❌ Number of levels must be at least 1, but got {n_levels}")
+        
         super(ImageEncoder, self).__init__()
 
-        self.pretrained = pretrained
         self.freeze = freeze
+        self.n_levels = n_levels
         self.model_name = model_name
+        self.pretrained = pretrained
 
         self.pnas = timm.create_model(
             model_name=model_name, pretrained=pretrained, features_only=True
@@ -52,7 +57,7 @@ class ImageEncoder(nn.Module):
         Get the number of channels of the features extracted by the model, from lower-level to higher-level features.
         Example: [96, 270, 1080, 2160, 4320] means that the first lower-level feature has 96 channels, the second 270, and so on.
         """
-        return [feature_info["num_chs"] for feature_info in self.pnas.feature_info]
+        return [feature_info["num_chs"] for feature_info in self.pnas.feature_info][: self.n_levels]
 
     def _get_feature_sizes(self) -> List[int]:
         """
@@ -64,7 +69,7 @@ class ImageEncoder(nn.Module):
         """
         with torch.no_grad():
             x = torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE)
-            image_features = self.pnas(x)
+            image_features = self.forward(x)
             feature_sizes = [image_feature.size()[-1] for image_feature in image_features]
 
         return feature_sizes
@@ -84,6 +89,6 @@ class ImageEncoder(nn.Module):
                 f"❌ Input image size must be {IMAGE_SIZE}x{IMAGE_SIZE}, but got {x.shape[-2]}x{x.shape[-1]}"
             )
 
-        image_features = self.pnas(x)
+        image_features = self.pnas(x)[: self.n_levels]
 
         return image_features

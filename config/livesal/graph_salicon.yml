@@ -8,6 +8,7 @@ splits: [0.6, 0.3, 0.1]
 save_model: True
 with_transforms: True
 
+image_n_levels: 5
 freeze_encoder: True
 hidden_channels: 64
 neighbor_radius: 1

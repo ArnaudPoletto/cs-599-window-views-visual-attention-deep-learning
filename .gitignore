@@ -1,6 +1,7 @@
 data/
 generated/
 *wandb/
+thesis/
 *.pth
 paths.py
 

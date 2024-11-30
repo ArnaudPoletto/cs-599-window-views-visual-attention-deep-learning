@@ -123,6 +123,7 @@ def main() -> None:
     splits = tuple(map(float, config["splits"]))
     save_model = bool(config["save_model"])
     with_transforms = bool(config["with_transforms"])
+    image_n_levels = int(config["image_n_levels"])
     hidden_channels = int(config["hidden_channels"])
     neighbor_radius = int(config["neighbor_radius"])
     n_iterations = int(config["n_iterations"])
@@ -147,6 +148,7 @@ def main() -> None:
 
     # Get model
     model = LiveSAL(
+        image_n_levels=image_n_levels,
         freeze_encoder=freeze_encoder,
         hidden_channels=hidden_channels,
         neighbor_radius=neighbor_radius,
