@@ -8,6 +8,7 @@ import random
 import torch
 import numpy as np
 from PIL import Image
+from natsort import natsorted
 import lightning.pytorch as pl
 from torchvision import transforms
 from typing import List, Tuple, Optional
@@ -93,9 +94,7 @@ class SaliconDataset(Dataset):
         output_file_paths = get_paths_recursive(
             sample_folder_path, match_pattern="ground_truth_*.jpg", path_type="f"
         )
-        print("unsorted output_file_paths", output_file_paths)
-        output_file_paths = sorted(output_file_paths)
-        print(">>sorted output_file_paths", output_file_paths)
+        output_file_paths = natsorted(output_file_paths)
         frame = Image.open(frame_file_path).convert("RGB")
         ground_truths = [
                 Image.open(output_file_path).convert("L")

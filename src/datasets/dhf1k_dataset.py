@@ -8,6 +8,7 @@ import torch
 import random
 import numpy as np
 from PIL import Image
+from natsort import natsorted
 import lightning.pytorch as pl
 from torchvision import transforms
 from typing import List, Tuple, Optional
@@ -55,8 +56,8 @@ class DHF1KDataset(Dataset):
             )
 
             # Sort frames and ground truths paths
-            frames = sorted(frames)
-            ground_truths = sorted(ground_truths)
+            frames = natsorted(frames)
+            ground_truths = natsorted(ground_truths)
 
             # Remove any frames that do not have corresponding ground truth files. This mismatch
             # typically occurs at the end of videos that have fractional-second durations (e.g.,
