@@ -87,6 +87,7 @@ def parse_arguments() -> argparse.Namespace:
         "--n-nodes",
         "-n",
         type=int,
+        default=1,
         help="The number of nodes to use for distributed training.",
     )
 

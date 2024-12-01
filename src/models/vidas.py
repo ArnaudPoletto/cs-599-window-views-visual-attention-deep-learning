@@ -54,24 +54,22 @@ class DSAM(nn.Module):
     def forward(
         self, x: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        print("dsam input", x.shape)
 
         # Temporal average pooling
         x_pool = self.temporal_pool(x).squeeze(2)
-        print("dsam x_pool", x_pool.shape)
 
         # Generate saliency features
         saliency_maps = self.saliency_conv(x_pool)
-        print("dsam saliency_maps", saliency_maps.shape)
 
         # Generate attention maps
         attention = self.attention_layer(x_pool)
-        attention_map = torch.softmax(attention, dim=(2, 3))
-        print("dsam attention_map", attention_map.shape)
+        batch_size, channels, height, width = attention.shape
+        attention = attention.view(batch_size, channels, -1)
+        attention = torch.softmax(attention, dim=-1)
+        attention = attention.view(batch_size, channels, height, width)
 
         # Enhance features
-        enhanced = (1 + attention_map.unsqueeze(2)) * x
-        print("dsam enhanced", enhanced.shape)
+        enhanced = (1 + attention.unsqueeze(2)) * x
 
         return enhanced, saliency_maps
 
