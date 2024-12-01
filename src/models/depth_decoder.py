@@ -6,7 +6,10 @@ from src.config import IMAGE_SIZE
 
 class DepthDecoder(nn.Module):
     def __init__(self, hidden_channels: int):
-        super().__init__()
+        if hidden_channels % 4 != 0:
+            raise ValueError("❌ Hidden channels must be divisible by 4.")
+        
+        super(DepthDecoder, self).__init__()
 
         self.up1 = nn.Sequential(
             nn.ConvTranspose2d(
@@ -18,7 +21,7 @@ class DepthDecoder(nn.Module):
                 output_padding=0,
                 bias=False,
             ),
-            nn.BatchNorm2d(hidden_channels // 2),
+            nn.GroupNorm(num_groups=hidden_channels // 4, num_channels=hidden_channels // 2),
             nn.ReLU(inplace=True),
         )
 
@@ -31,7 +34,7 @@ class DepthDecoder(nn.Module):
                 padding=1,
                 bias=False,
             ),
-            nn.BatchNorm2d(hidden_channels),
+            nn.GroupNorm(num_groups=hidden_channels // 2, num_channels=hidden_channels),
             nn.ReLU(inplace=True),
         )
 
@@ -45,7 +48,7 @@ class DepthDecoder(nn.Module):
                 output_padding=1,
                 bias=False,
             ),
-            nn.BatchNorm2d(hidden_channels // 2),
+            nn.GroupNorm(num_groups=hidden_channels // 4, num_channels=hidden_channels // 2),
             nn.ReLU(inplace=True),
         )
 
@@ -58,7 +61,7 @@ class DepthDecoder(nn.Module):
                 padding=1,
                 bias=False,
             ),
-            nn.BatchNorm2d(hidden_channels),
+            nn.GroupNorm(num_groups=hidden_channels // 2, num_channels=hidden_channels),
             nn.ReLU(inplace=True),
         )
 
@@ -72,7 +75,7 @@ class DepthDecoder(nn.Module):
                 output_padding=0,
                 bias=False,
             ),
-            nn.BatchNorm2d(hidden_channels),
+            nn.GroupNorm(num_groups=hidden_channels // 2, num_channels=hidden_channels),
             nn.ReLU(inplace=True),
         )
 

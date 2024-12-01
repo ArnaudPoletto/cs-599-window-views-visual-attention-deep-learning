@@ -45,9 +45,8 @@ class SpatioTemporalMixingModule(nn.Module):
                         out_channels=out_channels,
                         kernel_size=3,
                         padding=1,
-                        bias=False,
+                        bias=True,
                     ),
-                    nn.BatchNorm2d(num_features=out_channels),
                     nn.ReLU(),
                 )
                 for in_channels, inc_channels, out_channels in zip(
@@ -64,9 +63,8 @@ class SpatioTemporalMixingModule(nn.Module):
                 out_channels=final_channels,
                 kernel_size=5,
                 padding=2,
-                bias=False,
+                bias=True,
             ),
-            nn.BatchNorm2d(num_features=final_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channels=final_channels,

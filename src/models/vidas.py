@@ -25,7 +25,6 @@ class DSAM(nn.Module):
                 padding=0,
                 bias=True,
             ),
-            nn.BatchNorm2d(num_features=saliency_out_channels),
             nn.ReLU(),
         )
         self.attention_layer = nn.Sequential(
@@ -34,9 +33,8 @@ class DSAM(nn.Module):
                 out_channels=attention_out_channels,
                 kernel_size=3,
                 padding=1,
-                bias=False,
+                bias=True,
             ),
-            nn.BatchNorm2d(num_features=attention_out_channels),
             nn.ReLU(),
             nn.Conv2d(
                 in_channels=attention_out_channels,
@@ -45,7 +43,6 @@ class DSAM(nn.Module):
                 padding=0,
                 bias=True,
             ),
-            nn.BatchNorm2d(num_features=1),
             nn.ReLU(),
         )
 
@@ -163,8 +160,8 @@ class ViDaSEncoder(nn.Module):
                 kernel_size=kernel_size,
                 stride=stride,
                 padding=padding,
+                bias=True,
             ),
-            nn.BatchNorm3d(num_features=out_channels),
             nn.ReLU(),
             nn.Conv3d(
                 in_channels=out_channels,
@@ -172,8 +169,8 @@ class ViDaSEncoder(nn.Module):
                 kernel_size=kernel_size,
                 stride=1,
                 padding=padding,
+                bias=True,
             ),
-            nn.BatchNorm3d(num_features=out_channels),
             nn.ReLU(),
         )
 
@@ -229,9 +226,8 @@ class ViDaSDecoder(nn.Module):
                     out_channels=saliency_out_channels,
                     kernel_size=3,
                     padding=1,
-                    bias=False,
+                    bias=True,
                 ),
-                nn.BatchNorm2d(num_features=saliency_out_channels),
             )
             self.convs.append(conv)
 
@@ -340,9 +336,8 @@ class ViDaS(nn.Module):
                 kernel_size=5,
                 padding=2,
                 groups=saliency_out_channels // 2,
-                bias=False,
+                bias=True,
             ),
-            nn.BatchNorm2d(num_features=saliency_out_channels // 2),
             nn.ReLU(),
             nn.Conv2d(
                 in_channels=saliency_out_channels // 2,

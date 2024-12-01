@@ -5,24 +5,27 @@ from src.config import IMAGE_SIZE
 
 class DepthEncoder(nn.Module):
     def __init__(self, hidden_channels: int):
-        super().__init__()
+        if hidden_channels % 4 != 0:
+            raise ValueError("❌ Hidden channels must be divisible by 4.")
         
+        super(DepthEncoder, self).__init__()
+
         # Split into individual layers for skip connections
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, hidden_channels//4, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(hidden_channels//4),
+            nn.GroupNorm(num_groups=hidden_channels//8, num_channels=hidden_channels//4),
             nn.ReLU(inplace=True)
         )
         
         self.conv2 = nn.Sequential(
             nn.Conv2d(hidden_channels//4, hidden_channels//2, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(hidden_channels//2),
+            nn.GroupNorm(num_groups=hidden_channels//4, num_channels=hidden_channels//2),
             nn.ReLU(inplace=True)
         )
         
         self.conv3 = nn.Sequential(
             nn.Conv2d(hidden_channels//2, hidden_channels, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(hidden_channels),
+            nn.GroupNorm(num_groups=hidden_channels//2, num_channels=hidden_channels),
             nn.ReLU(inplace=True)
         )
 

@@ -56,7 +56,6 @@ class ImageDecoder(nn.Module):
                         padding=1,
                         bias=False,
                     ),
-                    nn.BatchNorm2d(num_features=out_channels),
                     nn.ReLU(inplace=True),
                 )
                 for in_channels, inc_channels, out_channels in zip(
@@ -73,9 +72,8 @@ class ImageDecoder(nn.Module):
                 out_channels=final_channels,
                 kernel_size=5,
                 padding=2,
-                bias=False,
+                bias=True,
             ),
-            nn.BatchNorm2d(num_features=final_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channels=final_channels,
