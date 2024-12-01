@@ -51,6 +51,15 @@ class DSAM(nn.Module):
 
         self.relu = nn.ReLU()
 
+    def _normalize_spatial_dimensions(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.clone()
+        batch_size, channels , height, width = x.size()
+        x = x.view(batch_size, channels, -1)
+        x = x / (x.max(dim=2, keepdim=True)[0] + self.eps)
+        x = x.view(batch_size, channels, height, width)
+
+        return x
+
     def forward(
         self, x: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -354,6 +363,15 @@ class ViDaS(nn.Module):
         normalized_x = (x - mean) / (std + eps)
 
         return normalized_x
+    
+    def _normalize_spatial_dimensions(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.clone()
+        batch_size, channels , height, width = x.size()
+        x = x.view(batch_size, channels, -1)
+        x = x / (x.max(dim=2, keepdim=True)[0] + self.eps)
+        x = x.view(batch_size, channels, height, width)
+
+        return x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.with_depth_information:
@@ -382,6 +400,7 @@ class ViDaS(nn.Module):
             decoded_maps = torch.cat([image_decoded_maps, depth_decoded_maps], dim=1)
         else:
             decoded_maps = image_decoded_maps
-        global_output = self.final_layer(decoded_maps).squeeze(1)
+        global_output = self.final_layer(decoded_maps)
+        global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
 
         return None, global_output

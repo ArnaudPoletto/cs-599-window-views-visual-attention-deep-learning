@@ -111,6 +111,15 @@ class TempSAL(nn.Module):
         normalized_x = (x - mean) / (std + eps)
 
         return normalized_x
+
+    def _normalize_spatial_dimensions(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.clone()
+        batch_size, channels , height, width = x.size()
+        x = x.view(batch_size, channels, -1)
+        x = x / (x.max(dim=2, keepdim=True)[0] + self.eps)
+        x = x.view(batch_size, channels, height, width)
+
+        return x
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -129,7 +138,7 @@ class TempSAL(nn.Module):
         # Decode temporal features and get temporal output
         temporal_features = self.temporal_decoder(encoded_features_list)
         temporal_output = self.sigmoid(temporal_features)
-        temporal_output = temporal_output / (temporal_output.max(dim=(2, 3), keepdim=True)[0] + self.eps)
+        temporal_output = self._normalize_spatial_dimensions(temporal_output)
 
         # Decode global features and get global output with spatio-temporal mixing module if needed
         if self.with_global_output:
@@ -138,8 +147,8 @@ class TempSAL(nn.Module):
                 encoded_features_list=encoded_features_list,
                 temporal_features=temporal_features,
                 global_features=global_features,
-            ).squeeze(1)
-            global_output = global_output / (global_output.max(dim=(1, 2), keepdim=True)[0] + self.eps)
+            )
+            global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
         else:
             global_output = None
 

@@ -244,6 +244,15 @@ class LiveSAL(nn.Module):
         normalized_x = (x - mean) / (std + eps)
 
         return normalized_x
+    
+    def _normalize_spatial_dimensions(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.clone()
+        batch_size, channels , height, width = x.size()
+        x = x.view(batch_size, channels, -1)
+        x = x / (x.max(dim=2, keepdim=True)[0] + self.eps)
+        x = x.view(batch_size, channels, height, width)
+
+        return x
 
     def _get_image_features_list(
         self, x: torch.Tensor, is_image: bool
@@ -462,11 +471,12 @@ class LiveSAL(nn.Module):
             depth_decoded_features=depth_decoded_features,
         )
         temporal_output = self.sigmoid(temporal_features)
-        temporal_output = temporal_output / (temporal_output.max(dim=(2, 3), keepdim=True)[0] + self.eps)
+        temporal_output = self._normalize_spatial_dimensions(temporal_output)
 
         # Get global output if required
         if self.with_global_output:
-            global_output = self.final_global_layer(temporal_features).squeeze(1)
+            global_output = self.final_global_layer(temporal_features)
+            global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
         else:
             global_output = None
 
