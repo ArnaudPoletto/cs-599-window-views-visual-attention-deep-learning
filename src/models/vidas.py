@@ -259,6 +259,7 @@ class ViDaS(nn.Module):
         saliency_out_channels: int,
         attention_out_channels: int,
         with_depth_information: bool,
+        eps: float = 1e-6,
     ) -> None:
         super(ViDaS, self).__init__()
 
@@ -269,6 +270,7 @@ class ViDaS(nn.Module):
         self.saliency_out_channels = saliency_out_channels
         self.attention_out_channels = attention_out_channels
         self.with_depth_information = with_depth_information
+        self.eps = eps
 
         self.image_encoder = ViDaSEncoder(
             input_channels=input_channels,
@@ -357,10 +359,9 @@ class ViDaS(nn.Module):
         x: torch.Tensor, 
         mean: torch.Tensor, 
         std: torch.Tensor,
-        eps: float = 1e-6,
     ) -> torch.Tensor:
         x = x.clone()
-        normalized_x = (x - mean) / (std + eps)
+        normalized_x = (x - mean) / (std + self.eps)
 
         return normalized_x
     

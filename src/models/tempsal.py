@@ -43,7 +43,7 @@ class TempSAL(nn.Module):
         self.freeze_encoder = freeze_encoder
         self.freeze_temporal_pipeline = freeze_temporal_pipeline
         self.hidden_channels_list = hidden_channels_list
-        self.with_global_output = 
+        self.with_global_output = with_global_output
         self.eps = eps
 
         # Get normalization parameters for encoder inputs
@@ -105,10 +105,9 @@ class TempSAL(nn.Module):
         x: torch.Tensor,
         mean: torch.Tensor,
         std: torch.Tensor,
-        eps: float = 1e-6,
     ) -> torch.Tensor:
         x = x.clone()
-        normalized_x = (x - mean) / (std + eps)
+        normalized_x = (x - mean) / (std + self.eps)
 
         return normalized_x
 

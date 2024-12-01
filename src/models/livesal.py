@@ -28,6 +28,7 @@ class LiveSAL(nn.Module):
         with_graph_directional_kernels: bool,
         with_depth_information: bool,
         with_global_output: bool,
+        eps: float = 1e-6,
     ) -> None:
         super(LiveSAL, self).__init__()
 
@@ -45,6 +46,7 @@ class LiveSAL(nn.Module):
         self.with_graph_directional_kernels = with_graph_directional_kernels
         self.with_depth_information = with_depth_information
         self.with_global_output = with_global_output
+        self.eps = eps
 
         # Get normalization parameters for encoder/estimator inputs
         self.register_buffer(
@@ -238,10 +240,9 @@ class LiveSAL(nn.Module):
         x: torch.Tensor,
         mean: torch.Tensor,
         std: torch.Tensor,
-        eps: float = 1e-6,
     ) -> torch.Tensor:
         x = x.clone()
-        normalized_x = (x - mean) / (std + eps)
+        normalized_x = (x - mean) / (std + self.eps)
 
         return normalized_x
     
