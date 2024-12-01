@@ -108,7 +108,13 @@ class LiveSAL(nn.Module):
                         in_channels=in_ch + (1 * with_early_depth_integration),
                         out_channels=max(in_ch // 2, hidden_channels),
                         kernel_size=1,
-                        bias=True,
+                        bias=False,
+                    ),
+                    nn.GroupNorm(
+                        num_groups=LiveSAL._get_num_groups(
+                            max(in_ch // 2, hidden_channels), 32
+                        ),
+                        num_channels=max(in_ch // 2, hidden_channels),
                     ),
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
@@ -116,7 +122,11 @@ class LiveSAL(nn.Module):
                         in_channels=max(in_ch // 2, hidden_channels),
                         out_channels=hidden_channels,
                         kernel_size=1,
-                        bias=True,
+                        bias=False,
+                    ),
+                    nn.GroupNorm(
+                        num_groups=LiveSAL._get_num_groups(hidden_channels, 32),
+                        num_channels=hidden_channels,
                     ),
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
@@ -148,6 +158,10 @@ class LiveSAL(nn.Module):
                         padding=1,
                         bias=True,
                     ),
+                    nn.GroupNorm(
+                        num_groups=LiveSAL._get_num_groups(hidden_channels, 32),
+                        num_channels=hidden_channels,
+                    ),
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
                     nn.Conv2d(
@@ -156,6 +170,10 @@ class LiveSAL(nn.Module):
                         kernel_size=3,
                         padding=1,
                         bias=True,
+                    ),
+                    nn.GroupNorm(
+                        num_groups=LiveSAL._get_num_groups(hidden_channels, 32),
+                        num_channels=hidden_channels,
                     ),
                     nn.ReLU(inplace=True),
                     nn.Dropout2d(dropout_rate),
@@ -174,6 +192,10 @@ class LiveSAL(nn.Module):
                 padding=2,
                 bias=True,
             ),
+            nn.GroupNorm(
+                num_groups=LiveSAL._get_num_groups(hidden_channels // 2, 16),
+                num_channels=hidden_channels // 2,
+            ),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channels=hidden_channels // 2,
@@ -188,14 +210,14 @@ class LiveSAL(nn.Module):
             self.final_global_layer = nn.Sequential(
                 nn.Conv2d(
                     in_channels=SEQUENCE_LENGTH,
-                    out_channels=hidden_channels,
+                    out_channels=SEQUENCE_LENGTH,
                     kernel_size=5,
                     padding=2,
                     bias=True,
                 ),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(
-                    in_channels=hidden_channels,
+                    in_channels=SEQUENCE_LENGTH,
                     out_channels=1,
                     kernel_size=5,
                     padding=2,
@@ -217,36 +239,12 @@ class LiveSAL(nn.Module):
             for param in self.final_temporal_layer.parameters():
                 param.requires_grad = False
 
-        self.init_weights()
+    def _get_num_groups(num_channels, max_groups):
+        num_groups = min(max_groups, num_channels)
+        while num_channels % num_groups != 0 and num_groups > 1:
+            num_groups -= 1
 
-    def init_weights(self) -> None:
-        if self.with_depth_information:
-            if self.depth_integration in ["late", "both"]:
-                for m in self.depth_graph_processor.modules():
-                    self._init_module(m)
-                for m in self.depth_decoder.modules():
-                    self._init_module(m)
-        for m in self.image_projection_layers.modules():
-            self._init_module(m)
-        if self.with_graph_processing:
-            for m in self.image_graph_processor.modules():
-                self._init_module(m)
-        for m in self.temporal_layers.modules():
-            self._init_module(m)
-        for m in self.final_temporal_layer.modules():
-            self._init_module(m)
-        if self.with_global_output:
-            for m in self.final_global_layer.modules():
-                self._init_module(m)
-
-    def _init_module(self, m):
-        if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.BatchNorm2d):
-            nn.init.constant_(m.weight, 1)
-            nn.init.constant_(m.bias, 0)
+        return num_groups
 
     def _normalize_input(
         self,

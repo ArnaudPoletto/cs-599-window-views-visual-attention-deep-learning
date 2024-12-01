@@ -6,8 +6,8 @@ from src.config import IMAGE_SIZE
 
 class DepthDecoder(nn.Module):
     def __init__(self, hidden_channels: int):
-        if hidden_channels % 4 != 0:
-            raise ValueError("❌ Hidden channels must be divisible by 4.")
+        if hidden_channels % 2 != 0:
+            raise ValueError("❌ Hidden channels must be divisible by 2.")
         
         super(DepthDecoder, self).__init__()
 
@@ -21,7 +21,7 @@ class DepthDecoder(nn.Module):
                 output_padding=0,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=hidden_channels // 4, num_channels=hidden_channels // 2),
+            nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels // 2, 16), num_channels=hidden_channels // 2),
             nn.ReLU(inplace=True),
         )
 
@@ -34,7 +34,7 @@ class DepthDecoder(nn.Module):
                 padding=1,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=hidden_channels // 2, num_channels=hidden_channels),
+            nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
             nn.ReLU(inplace=True),
         )
 
@@ -48,7 +48,7 @@ class DepthDecoder(nn.Module):
                 output_padding=1,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=hidden_channels // 4, num_channels=hidden_channels // 2),
+            nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels // 2, 16), num_channels=hidden_channels // 2),
             nn.ReLU(inplace=True),
         )
 
@@ -61,7 +61,7 @@ class DepthDecoder(nn.Module):
                 padding=1,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=hidden_channels // 2, num_channels=hidden_channels),
+            nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
             nn.ReLU(inplace=True),
         )
 
@@ -75,9 +75,16 @@ class DepthDecoder(nn.Module):
                 output_padding=0,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=hidden_channels // 2, num_channels=hidden_channels),
+            nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
             nn.ReLU(inplace=True),
         )
+
+    def _get_num_groups(num_channels, max_groups):
+        num_groups = min(max_groups, num_channels)
+        while num_channels % num_groups != 0 and num_groups > 1:
+            num_groups -= 1
+
+        return num_groups
 
     def forward(
         self, x: torch.Tensor, skip_features: list[torch.Tensor]

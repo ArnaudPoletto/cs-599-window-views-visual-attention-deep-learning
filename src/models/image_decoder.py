@@ -54,8 +54,9 @@ class ImageDecoder(nn.Module):
                         out_channels=out_channels,
                         kernel_size=3,
                         padding=1,
-                        bias=True,
+                        bias=False,
                     ),
+                    nn.GroupNorm(num_groups=ImageDecoder._get_num_groups(out_channels, 32), num_channels=out_channels),
                     nn.ReLU(inplace=True),
                 )
                 for in_channels, inc_channels, out_channels in zip(
@@ -72,8 +73,9 @@ class ImageDecoder(nn.Module):
                 out_channels=final_channels,
                 kernel_size=5,
                 padding=2,
-                bias=True,
+                bias=False,
             ),
+            nn.GroupNorm(num_groups=ImageDecoder._get_num_groups(final_channels, 32), num_channels=final_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channels=final_channels,
@@ -84,6 +86,13 @@ class ImageDecoder(nn.Module):
             ),
             nn.Sigmoid() if with_final_sigmoid else nn.Identity(),
         )
+
+    def _get_num_groups(num_channels, max_groups):
+        num_groups = min(max_groups, num_channels)
+        while num_channels % num_groups != 0 and num_groups > 1:
+            num_groups -= 1
+
+        return num_groups
 
     def forward(self, xs: List[torch.Tensor]) -> torch.Tensor:
         """

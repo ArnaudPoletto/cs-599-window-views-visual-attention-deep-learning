@@ -76,8 +76,9 @@ class GraphProcessor(nn.Module):
                 out_channels=hidden_channels,
                 kernel_size=3,
                 padding=1,
-                bias=True,
+                bias=False,
             ),
+            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
             nn.ReLU(inplace=True),
         )
         self.intra_alpha = nn.Parameter(torch.tensor(0.5))
@@ -174,7 +175,6 @@ class GraphProcessor(nn.Module):
                 bias=True,
             ),
             nn.AdaptiveAvgPool2d(1),
-            nn.Dropout(dropout_rate),
             nn.Sigmoid(),
         )
         self.inter_output = nn.Sequential(
@@ -183,10 +183,10 @@ class GraphProcessor(nn.Module):
                 out_channels=hidden_channels,
                 kernel_size=3,
                 padding=1,
-                bias=True,
+                bias=False,
             ),
+            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout_rate),
         )
 
         # Get the final components to combine intra- and inter-attention
@@ -197,6 +197,13 @@ class GraphProcessor(nn.Module):
             kernel_size=3,
             padding=1,
         )
+
+    def _get_num_groups(num_channels, max_groups):
+        num_groups = min(max_groups, num_channels)
+        while num_channels % num_groups != 0 and num_groups > 1:
+            num_groups -= 1
+
+        return num_groups
 
     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
         """
