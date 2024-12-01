@@ -54,7 +54,7 @@ class ImageDecoder(nn.Module):
                         out_channels=out_channels,
                         kernel_size=3,
                         padding=1,
-                        bias=False,
+                        bias=True,
                     ),
                     nn.ReLU(inplace=True),
                 )
