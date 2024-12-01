@@ -275,7 +275,7 @@ class ViDaS(nn.Module):
             saliency_out_channels=saliency_out_channels,
         )
         self.image_upsample = nn.Upsample(
-            size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
+            size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
         )
 
         self.register_buffer(
@@ -305,7 +305,7 @@ class ViDaS(nn.Module):
                 saliency_out_channels=saliency_out_channels,
             )
             self.depth_upsample = nn.Upsample(
-                size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
+                size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
             )
 
             self.register_buffer(
@@ -326,8 +326,8 @@ class ViDaS(nn.Module):
             nn.Conv2d(
                 in_channels=final_layer_in_channels,
                 out_channels=saliency_out_channels // 2,
-                kernel_size=3,
-                padding=1,
+                kernel_size=5,
+                padding=2,
                 groups=saliency_out_channels // 2,
                 bias=False,
             ),
@@ -336,8 +336,8 @@ class ViDaS(nn.Module):
             nn.Conv2d(
                 in_channels=saliency_out_channels // 2,
                 out_channels=1,
-                kernel_size=1,
-                padding=0,
+                kernel_size=5,
+                padding=2,
                 bias=True,
             ),
             nn.Sigmoid(),

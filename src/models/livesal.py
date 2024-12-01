@@ -172,8 +172,8 @@ class LiveSAL(nn.Module):
             nn.Conv2d(
                 in_channels=final_temporal_layer_in_channels,
                 out_channels=hidden_channels // 2,
-                kernel_size=3,
-                padding=1,
+                kernel_size=5,
+                padding=2,
                 bias=False,
             ),
             nn.BatchNorm2d(hidden_channels // 2),
@@ -181,8 +181,8 @@ class LiveSAL(nn.Module):
             nn.Conv2d(
                 in_channels=hidden_channels // 2,
                 out_channels=1,
-                kernel_size=3,
-                padding=1,
+                kernel_size=5,
+                padding=2,
                 bias=True,
             ),
         )
@@ -393,7 +393,7 @@ class LiveSAL(nn.Module):
 
         # Get the final decoded features
         decoded_features = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
         )
         if self.with_depth_information and self.depth_integration in ["late", "both"]:
             decoded_features = torch.cat(
@@ -462,6 +462,7 @@ class LiveSAL(nn.Module):
             depth_decoded_features=depth_decoded_features,
         )
         temporal_output = self.sigmoid(temporal_features)
+        temporal_output = temporal_output / (temporal_output.max(dim=(2, 3), keepdim=True)[0] + self.eps)
 
         # Get global output if required
         if self.with_global_output:

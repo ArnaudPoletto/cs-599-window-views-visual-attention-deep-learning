@@ -22,6 +22,7 @@ class ImageDecoder(nn.Module):
         hidden_channels_list: List[int],
         features_sizes: List[int],
         output_channels: int,
+        with_final_sigmoid: bool,
     ) -> None:
         """
         Initialize the image decoder.
@@ -31,6 +32,7 @@ class ImageDecoder(nn.Module):
             hidden_channels (List[int]): The number of hidden channels to use, i.e. the number of output channels of the decoder layers.
             features_sizes (List[int]): The spatial size of the features to decode.
             output_channels (int): The number of output channels.
+            with_final_sigmoid (bool): Whether to apply a sigmoid activation to the output.
         """
         super(ImageDecoder, self).__init__()
 
@@ -69,8 +71,8 @@ class ImageDecoder(nn.Module):
             nn.Conv2d(
                 in_channels=final_channels,
                 out_channels=final_channels,
-                kernel_size=3,
-                padding=1,
+                kernel_size=5,
+                padding=2,
                 bias=False,
             ),
             nn.BatchNorm2d(num_features=final_channels),
@@ -78,11 +80,11 @@ class ImageDecoder(nn.Module):
             nn.Conv2d(
                 in_channels=final_channels,
                 out_channels=output_channels,
-                kernel_size=3,
-                padding=1,
+                kernel_size=5,
+                padding=2,
                 bias=True,
             ),
-            nn.Sigmoid(),
+            nn.Sigmoid() if with_final_sigmoid else nn.Identity(),
         )
 
     def forward(self, xs: List[torch.Tensor]) -> torch.Tensor:
@@ -108,7 +110,7 @@ class ImageDecoder(nn.Module):
 
         # Get the final output
         output = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
         )
         output = self.final_layer(output)
 

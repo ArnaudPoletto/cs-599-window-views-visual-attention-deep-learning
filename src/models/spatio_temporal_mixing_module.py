@@ -62,8 +62,8 @@ class SpatioTemporalMixingModule(nn.Module):
             nn.Conv2d(
                 in_channels=final_channels,
                 out_channels=final_channels,
-                kernel_size=3,
-                padding=1,
+                kernel_size=5,
+                padding=2,
                 bias=False,
             ),
             nn.BatchNorm2d(num_features=final_channels),
@@ -71,8 +71,8 @@ class SpatioTemporalMixingModule(nn.Module):
             nn.Conv2d(
                 in_channels=final_channels,
                 out_channels=1,
-                kernel_size=3,
-                padding=1,
+                kernel_size=5,
+                padding=2,
                 bias=True,
             ),
             nn.Sigmoid(),
@@ -133,7 +133,7 @@ class SpatioTemporalMixingModule(nn.Module):
 
         # Get the final output
         output = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
         )
         output = self.final_layer(output)
 

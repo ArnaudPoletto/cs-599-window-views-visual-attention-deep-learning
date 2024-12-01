@@ -29,6 +29,7 @@ class TempSAL(nn.Module):
         freeze_temporal_pipeline: bool,
         hidden_channels_list: List[int],
         with_global_output: bool,
+        eps: float = 1e-6,
     ) -> None:
         """
         Initialize the TempSAL model.
@@ -42,7 +43,8 @@ class TempSAL(nn.Module):
         self.freeze_encoder = freeze_encoder
         self.freeze_temporal_pipeline = freeze_temporal_pipeline
         self.hidden_channels_list = hidden_channels_list
-        self.with_global_output = with_global_output
+        self.with_global_output = 
+        self.eps = eps
 
         # Get normalization parameters for encoder inputs
         self.register_buffer(
@@ -65,6 +67,7 @@ class TempSAL(nn.Module):
             hidden_channels_list=hidden_channels_list,
             features_sizes=self.image_encoder.feature_sizes,
             output_channels=SEQUENCE_LENGTH,
+            with_final_sigmoid=False,
         )
         if with_global_output:
             self.global_decoder = ImageDecoder(
@@ -72,11 +75,14 @@ class TempSAL(nn.Module):
                 hidden_channels_list=hidden_channels_list,
                 features_sizes=self.image_encoder.feature_sizes,
                 output_channels=1,
+                with_final_sigmoid=False,
             )
             self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
                 hidden_channels_list=hidden_channels_list,
                 feature_channels_list=self.image_encoder.feature_channels_list,
             )
+
+        self.sigmoid = nn.Sigmoid()
 
         if freeze_temporal_pipeline:
             for param in self.temporal_decoder.parameters():
@@ -105,7 +111,7 @@ class TempSAL(nn.Module):
         normalized_x = (x - mean) / (std + eps)
 
         return normalized_x
-
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the TempSAL model.
@@ -120,11 +126,12 @@ class TempSAL(nn.Module):
         x_image = self._normalize_input(x, self.image_mean, self.image_std)
         encoded_features_list = self.image_encoder(x_image)
 
-        # Decode the temporal and global features
+        # Decode temporal features and get temporal output
         temporal_features = self.temporal_decoder(encoded_features_list)
-        temporal_output = temporal_features
+        temporal_output = self.sigmoid(temporal_features)
+        temporal_output = temporal_output / (temporal_output.max(dim=(2, 3), keepdim=True)[0] + self.eps)
 
-        # Estimate global saliency map using spatio-temporal mixing module if required
+        # Decode global features and get global output with spatio-temporal mixing module if needed
         if self.with_global_output:
             global_features = self.global_decoder(encoded_features_list)
             global_output = self.spatio_temporal_mixing_module(
@@ -132,6 +139,7 @@ class TempSAL(nn.Module):
                 temporal_features=temporal_features,
                 global_features=global_features,
             ).squeeze(1)
+            global_output = global_output / (global_output.max(dim=(1, 2), keepdim=True)[0] + self.eps)
         else:
             global_output = None
 
