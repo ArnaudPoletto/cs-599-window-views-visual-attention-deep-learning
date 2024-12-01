@@ -192,8 +192,8 @@ class LiveSAL(nn.Module):
                 nn.Conv2d(
                     in_channels=SEQUENCE_LENGTH,
                     out_channels=hidden_channels,
-                    kernel_size=3,
-                    padding=1,
+                    kernel_size=5,
+                    padding=2,
                     bias=False,
                 ),
                 nn.BatchNorm2d(hidden_channels),
@@ -201,8 +201,8 @@ class LiveSAL(nn.Module):
                 nn.Conv2d(
                     in_channels=hidden_channels,
                     out_channels=1,
-                    kernel_size=3,
-                    padding=1,
+                    kernel_size=5,
+                    padding=2,
                     bias=True,
                 ),
                 nn.Sigmoid(),
