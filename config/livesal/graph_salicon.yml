@@ -15,7 +15,7 @@ hidden_channels: 64
 neighbor_radius: 1
 n_iterations: 3
 depth_integration: "late" #"early", "late", "both"
-dropout_rate: 0.1
+dropout_rate: 0.2
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True

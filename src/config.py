@@ -19,6 +19,7 @@ SETS_PATH = f"{DATA_PATH}/sets"
 SAMPLES_PATH = f"{DATA_PATH}/samples"
 GROUND_TRUTHS_PATH = f"{DATA_PATH}/ground_truths"
 MODELS_PATH = f"{DATA_PATH}/models"
+CHECKPOINTS_PATH = f"{DATA_PATH}/checkpoints"
 
 SALICON_PATH = f"{DATA_PATH}/salicon"
 RAW_SALICON_PATH = f"{SALICON_PATH}/raw"

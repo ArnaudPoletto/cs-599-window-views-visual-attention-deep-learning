@@ -5,7 +5,7 @@ from typing import List
 from src.models.image_encoder import ImageEncoder
 from src.models.image_decoder import ImageDecoder
 from src.models.spatio_temporal_mixing_module import SpatioTemporalMixingModule
-from src.config import SEQUENCE_LENGTH
+from src.config import SEQUENCE_LENGTH, CHECKPOINTS_PATH
 
 
 class TempSAL(nn.Module):
@@ -28,7 +28,7 @@ class TempSAL(nn.Module):
         freeze_encoder: bool,
         freeze_temporal_pipeline: bool,
         hidden_channels_list: List[int],
-        with_global_output: bool,
+        output_type: str,
         eps: float = 1e-6,
     ) -> None:
         """
@@ -38,12 +38,17 @@ class TempSAL(nn.Module):
             freeze_encoder (bool): Whether to freeze the encoder's parameters.
             hidden_channels_list (List[int]): The number of hidden channels to use in the decoders.
         """
+        if output_type not in ["temporal", "global"]:
+            raise ValueError(f"❌ Invalid output type: {output_type}")
+        if freeze_temporal_pipeline and output_type == "temporal":
+            raise ValueError("❌ Cannot freeze the temporal pipeline when output type is temporal.")
+        
         super(TempSAL, self).__init__()
 
         self.freeze_encoder = freeze_encoder
         self.freeze_temporal_pipeline = freeze_temporal_pipeline
         self.hidden_channels_list = hidden_channels_list
-        self.with_global_output = with_global_output
+        self.output_type = output_type
         self.eps = eps
 
         # Get normalization parameters for encoder inputs
@@ -69,7 +74,7 @@ class TempSAL(nn.Module):
             output_channels=SEQUENCE_LENGTH,
             with_final_sigmoid=False,
         )
-        if with_global_output:
+        if output_type == "global":
             self.global_decoder = ImageDecoder(
                 features_channels_list=self.image_encoder.feature_channels_list,
                 hidden_channels_list=hidden_channels_list,
@@ -128,7 +133,7 @@ class TempSAL(nn.Module):
         temporal_output = self._normalize_spatial_dimensions(temporal_output)
 
         # Decode global features and get global output with spatio-temporal mixing module if needed
-        if self.with_global_output:
+        if self.output_type == "global":
             global_features = self.global_decoder(encoded_features_list)
             global_output = self.spatio_temporal_mixing_module(
                 encoded_features_list=encoded_features_list,
@@ -136,7 +141,6 @@ class TempSAL(nn.Module):
                 global_features=global_features,
             )
             global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
+            return None, global_output
         else:
-            global_output = None
-
-        return temporal_output, global_output
+            return temporal_output, None

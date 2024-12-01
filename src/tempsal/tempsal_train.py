@@ -4,6 +4,7 @@ from pathlib import Path
 GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
+import os
 import time
 import torch
 import argparse
@@ -24,6 +25,7 @@ from src.config import (
     N_WORKERS,
     CONFIG_PATH,
     MODELS_PATH,
+    CHECKPOINTS_PATH,
     PROCESSED_SALICON_PATH,
 )
 
@@ -120,7 +122,8 @@ def main() -> None:
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
-    with_global_output = bool(config["with_global_output"])
+    output_type = str(config["output_type"])
+    with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
@@ -137,15 +140,28 @@ def main() -> None:
         freeze_encoder=freeze_encoder,
         freeze_temporal_pipeline=freeze_temporal_pipeline,
         hidden_channels_list=hidden_channels_list,
-        with_global_output=with_global_output,
+        output_type=output_type,
     )
-    lightning_model = LightningModel(
-        model=model,
-        learning_rate=learning_rate,
-        weight_decay=weight_decay,
-        name="tempsal",
-        dataset="salicon",
-    )
+    if with_checkpoint:
+        checkpoint_file_path = f"{CHECKPOINTS_PATH}/tempsal_checkpoint.ckpt"
+        if not os.path.exists(checkpoint_file_path):
+            raise FileNotFoundError(f"❌ File {Path(checkpoint_file_path).resolve()} not found.")
+        lightning_model = LightningModel.load_from_checkpoint(
+            checkpoint_path=checkpoint_file_path,
+            model=model,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            name="tempsal",
+            dataset="salicon",
+        )
+    else:
+        lightning_model = LightningModel(
+            model=model,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            name="tempsal",
+            dataset="salicon",
+        )
 
     # Get trainer and train
     wandb_name = f"{time.strftime('%Y%m%d-%H%M%S')}_tempsal"
