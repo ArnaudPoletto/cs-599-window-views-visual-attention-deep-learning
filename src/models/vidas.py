@@ -17,12 +17,16 @@ class DSAM(nn.Module):
         super(DSAM, self).__init__()
 
         self.temporal_pool = nn.AdaptiveAvgPool3d((1, None, None))
-        self.saliency_conv = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=saliency_out_channels,
-            kernel_size=1,
-            padding=0,
-            bias=True,
+        self.saliency_conv = nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=saliency_out_channels,
+                kernel_size=1,
+                padding=0,
+                bias=True,
+            ),
+            nn.BatchNorm2d(num_features=saliency_out_channels),
+            nn.ReLU(),
         )
         self.attention_layer = nn.Sequential(
             nn.Conv2d(
@@ -41,15 +45,8 @@ class DSAM(nn.Module):
                 padding=0,
                 bias=True,
             ),
-        )
-        # TODO: this upscale should scale with depth, i.e. do * 2 or * 4 etc...
-        self.upsample = nn.ConvTranspose2d(
-            in_channels=1,
-            out_channels=1,
-            kernel_size=4,
-            stride=2,
-            padding=1,
-            bias=True,
+            nn.BatchNorm2d(num_features=1),
+            nn.ReLU(),
         )
 
         self.relu = nn.ReLU()
@@ -57,22 +54,26 @@ class DSAM(nn.Module):
     def forward(
         self, x: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        print("dsam input", x.shape)
 
         # Temporal average pooling
         x_pool = self.temporal_pool(x).squeeze(2)
+        print("dsam x_pool", x_pool.shape)
 
         # Generate saliency features
         saliency_maps = self.saliency_conv(x_pool)
+        print("dsam saliency_maps", saliency_maps.shape)
 
         # Generate attention maps
         attention = self.attention_layer(x_pool)
-        attention_map = torch.softmax(attention.flatten(2), dim=2).view_as(attention)
-        activation_map = self.upsample(attention)  # TODO: not upsampled as needed yet
+        attention_map = torch.softmax(attention, dim=(2, 3))
+        print("dsam attention_map", attention_map.shape)
 
         # Enhance features
         enhanced = (1 + attention_map.unsqueeze(2)) * x
+        print("dsam enhanced", enhanced.shape)
 
-        return enhanced, saliency_maps, activation_map
+        return enhanced, saliency_maps
 
 
 class ViDaSEncoder(nn.Module):
@@ -193,7 +194,7 @@ class ViDaSEncoder(nn.Module):
         saliency_maps_list = []
         for encoder_block, dsam in zip(self.encoder_blocks, self.dsams):
             x = encoder_block(x)
-            x, saliency_maps, _ = dsam(x)
+            x, saliency_maps = dsam(x)
             saliency_maps_list.append(saliency_maps)
 
         return saliency_maps_list
