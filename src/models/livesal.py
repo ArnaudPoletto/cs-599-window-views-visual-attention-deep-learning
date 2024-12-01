@@ -217,6 +217,41 @@ class LiveSAL(nn.Module):
             for param in self.final_temporal_layer.parameters():
                 param.requires_grad = False
 
+        self.init_weights()
+
+    def init_weights(self) -> None:
+        if self.with_depth_information:
+            for m in self.depth_estimator.modules():
+                self._init_module(m)
+            if self.depth_integration in ["late", "both"]:
+                for m in self.depth_encoder.modules():
+                    self._init_module(m)
+                for m in self.depth_graph_processor.modules():
+                    self._init_module(m)
+                for m in self.depth_decoder.modules():
+                    self._init_module(m)
+        for m in self.image_projection_layers.modules():
+            self._init_module(m)
+        if self.with_graph_processing:
+            for m in self.image_graph_processor.modules():
+                self._init_module(m)
+        for m in self.temporal_layers.modules():
+            self._init_module(m)
+        for m in self.final_temporal_layer.modules():
+            self._init_module(m)
+        if self.with_global_output:
+            for m in self.final_global_layer.modules():
+                self._init_module(m)
+
+    def _init_module(self, m):
+        if isinstance(m, nn.Conv2d):
+            nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.BatchNorm2d):
+            nn.init.constant_(m.weight, 1)
+            nn.init.constant_(m.bias, 0)
+
     def _normalize_input(
         self,
         x: torch.Tensor,
