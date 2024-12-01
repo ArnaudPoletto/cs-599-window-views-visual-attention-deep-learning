@@ -7,6 +7,7 @@ sys.path.append(str(GLOBAL_DIR))
 import time
 import torch
 import argparse
+import platform
 import multiprocessing
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
@@ -94,7 +95,8 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 def main() -> None:
-    multiprocessing.set_start_method("forkserver", force=True)
+    if platform.system() != "Windows":
+        multiprocessing.set_start_method("forkserver", force=True)
     set_seed(SEED)
 
     # Parse arguments

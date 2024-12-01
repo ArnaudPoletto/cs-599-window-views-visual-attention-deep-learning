@@ -7,11 +7,11 @@ sys.path.append(str(GLOBAL_DIR))
 import time
 import torch
 import argparse
+import platform
 import multiprocessing
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
-
 
 from src.utils.random import set_seed
 from src.models.livesal import LiveSAL
@@ -119,7 +119,8 @@ def main() -> None:
     """
     The main function to train the LiveSAL model.
     """
-    multiprocessing.set_start_method("forkserver", force=True)
+    if platform.system() != "Windows":
+        multiprocessing.set_start_method("forkserver", force=True)
     set_seed(SEED)
 
     # Parse arguments
