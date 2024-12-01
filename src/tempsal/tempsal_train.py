@@ -78,7 +78,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/tempsal/temporal.yml",
+        default=f"{CONFIG_PATH}/tempsal/default.yml",
         help="The path to the config file.",
     )
 
@@ -96,7 +96,7 @@ def main() -> None:
     """
     The main function to train the TempSAL model.
     """
-    multiprocessing.set_start_method("forkserver", force=True)
+    #multiprocessing.set_start_method("forkserver", force=True)
     set_seed(SEED)
 
     # Parse arguments
