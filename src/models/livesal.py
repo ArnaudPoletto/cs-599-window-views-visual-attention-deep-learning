@@ -221,11 +221,7 @@ class LiveSAL(nn.Module):
 
     def init_weights(self) -> None:
         if self.with_depth_information:
-            for m in self.depth_estimator.modules():
-                self._init_module(m)
             if self.depth_integration in ["late", "both"]:
-                for m in self.depth_encoder.modules():
-                    self._init_module(m)
                 for m in self.depth_graph_processor.modules():
                     self._init_module(m)
                 for m in self.depth_decoder.modules():
