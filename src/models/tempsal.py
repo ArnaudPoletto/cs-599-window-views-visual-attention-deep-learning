@@ -74,23 +74,28 @@ class TempSAL(nn.Module):
             output_channels=SEQUENCE_LENGTH,
             with_final_sigmoid=False,
         )
-        if output_type == "global":
-            self.global_decoder = ImageDecoder(
-                features_channels_list=self.image_encoder.feature_channels_list,
-                hidden_channels_list=hidden_channels_list,
-                features_sizes=self.image_encoder.feature_sizes,
-                output_channels=1,
-                with_final_sigmoid=False,
-            )
-            self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
-                hidden_channels_list=hidden_channels_list,
-                feature_channels_list=self.image_encoder.feature_channels_list,
-            )
+        self.global_decoder = ImageDecoder(
+            features_channels_list=self.image_encoder.feature_channels_list,
+            hidden_channels_list=hidden_channels_list,
+            features_sizes=self.image_encoder.feature_sizes,
+            output_channels=1,
+            with_final_sigmoid=False,
+        )
+        self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
+            hidden_channels_list=hidden_channels_list,
+            feature_channels_list=self.image_encoder.feature_channels_list,
+        )
 
         self.sigmoid = nn.Sigmoid()
 
         if freeze_temporal_pipeline:
             for param in self.temporal_decoder.parameters():
+                param.requires_grad = False
+
+        if output_type == "temporal":
+            for param in self.global_decoder.parameters():
+                param.requires_grad = False
+            for param in self.spatio_temporal_mixing_module.parameters():
                 param.requires_grad = False
 
     def _normalize_input(

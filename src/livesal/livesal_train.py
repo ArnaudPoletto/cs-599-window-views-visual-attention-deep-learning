@@ -148,12 +148,13 @@ def main() -> None:
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     depth_integration = str(config["depth_integration"])
+    output_type = str(config["output_type"])
     dropout_rate = float(config["dropout_rate"])
     with_graph_edge_features = bool(config["with_graph_edge_features"])
     with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
     with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
     with_depth_information = bool(config["with_depth_information"])
-    with_global_output = bool(config["with_global_output"])
+    with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
@@ -175,21 +176,31 @@ def main() -> None:
         neighbor_radius=neighbor_radius,
         n_iterations=n_iterations,
         depth_integration=depth_integration,
+        output_type=output_type,
         dropout_rate=dropout_rate,
         with_graph_processing=with_graph_processing,
         with_graph_edge_features=with_graph_edge_features,
         with_graph_positional_embeddings=with_graph_positional_embeddings,
         with_graph_directional_kernels=with_graph_directional_kernels,
         with_depth_information=with_depth_information,
-        with_global_output=with_global_output,
     )
-    lightning_model = LightningModel(
-        model=model,
-        learning_rate=learning_rate,
-        weight_decay=weight_decay,
-        name="livesal",
-        dataset=dataset,
-    )
+    if with_checkpoint:
+        lightning_model = LightningModel.load_from_checkpoint(
+            checkpoint_path=f"{MODELS_PATH}/livesal/20210824-221529_livesal/epoch=0-val_loss=0.00.ckpt",
+            model=model,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            name="livesal",
+            dataset=dataset,
+        )
+    else:
+        lightning_model = LightningModel(
+            model=model,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            name="livesal",
+            dataset=dataset,
+        )
 
     # Get trainer and train
     wandb_name = f"{time.strftime('%Y%m%d-%H%M%S')}_livesal"
@@ -217,7 +228,7 @@ def main() -> None:
         devices=-1,
         num_nodes=n_nodes,
         precision=32,
-        strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
+        strategy="ddp_find_unused_parameters_true" if torch.cuda.device_count() > 1 else "auto",
         val_check_interval=evaluation_steps,
         logger=wandb_logger,
         callbacks=callbacks,
