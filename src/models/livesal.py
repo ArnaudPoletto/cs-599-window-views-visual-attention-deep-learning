@@ -223,18 +223,6 @@ class LiveSAL(nn.Module):
             for param in self.final_temporal_layer.parameters():
                 param.requires_grad = False
 
-        self.initialize_weights()
-
-    def initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
     def _normalize_input(
         self,
         x: torch.Tensor,
