@@ -1,6 +1,9 @@
+import os
 import torch
 from torch import nn
 from typing import List
+
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 from src.models.image_encoder import ImageEncoder
 from src.models.image_decoder import ImageDecoder
@@ -156,9 +159,23 @@ class TempSAL(nn.Module):
             torch.Tensor: The temporal and global saliency maps.
         """
         if self.output_type == "global":
-            encoded_features_list, temporal_features, _ = (
+            encoded_features_list, temporal_features, temporal_output = (
                 self._forward_temporal_pipeline(x)
             )
+            from matplotlib import pyplot as plt
+            plt.subplot(1, 6, 1)
+            plt.imshow(x[0].permute(1, 2, 0).cpu().detach().numpy())
+            plt.subplot(1, 6, 2)
+            plt.imshow(temporal_output[0][0].cpu().detach().numpy())
+            plt.subplot(1, 6, 3)
+            plt.imshow(temporal_output[0][1].cpu().detach().numpy())
+            plt.subplot(1, 6, 4)
+            plt.imshow(temporal_output[0][2].cpu().detach().numpy())
+            plt.subplot(1, 6, 5)
+            plt.imshow(temporal_output[0][3].cpu().detach().numpy())
+            plt.subplot(1, 6, 6)
+            plt.imshow(temporal_output[0][4].cpu().detach().numpy())
+            plt.show()
             global_output = self._forward_global_pipeline(
                 encoded_features_list, temporal_features
             )

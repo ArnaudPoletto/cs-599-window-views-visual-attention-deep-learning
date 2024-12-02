@@ -5,7 +5,6 @@ GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
 import os
-import shutil
 import argparse
 import numpy as np
 import pandas as pd
@@ -225,8 +224,31 @@ def get_subject_fixation_data(
     return subject_fixation_data
 
 
+def is_already_processed(gaze_file_path: str) -> bool:
+    gaze_file_name = os.path.basename(gaze_file_path)
+    sample_id = int(gaze_file_name.split("_")[-1].split(".")[0])
+    processed_path = f"{PROCESSED_SALICON_PATH}/{sample_id}"
+
+    # Check if folder exists
+    if not os.path.exists(processed_path):
+        return False
+
+    # Check if all files exist
+    if not os.path.exists(f"{processed_path}/frame.jpg"):
+        return False
+    if not os.path.exists(f"{processed_path}/global_ground_truth.png"):
+        return False
+    if not os.path.exists(f"{processed_path}/global_ground_truth_from_fixations.jpg"):
+        return False
+    for i in range(DURATION_N_FRAME):
+        if not os.path.exists(f"{processed_path}/ground_truth_{i}.jpg"):
+            return False
+
+    return True
+
+
 def process_sample(
-    gaze_file_path: str,
+    frame_file_path: str,
     dispersion_threshold_px: int,
     duration_threshold_ms: int,
     min_n_fixations: int,
@@ -236,24 +258,37 @@ def process_sample(
     Process a single sample.
 
     Args:
-        gaze_file_path (str): The gaze file path.
+        image_file_path (str): The image file path.
         dispersion_threshold_px (int): The dispersion threshold in pixels.
         duration_threshold_ms (int): The duration threshold in milliseconds.
         min_n_fixations (int): The minimum number of fixations required to generate a saliency map.
         kde_bandwidth (float): The bandwidth for the kernel density estimation.
     """
-    # Get gaze data and sample id
+    # Check if sample is already processed
+    sample_id = int(frame_file_path.split("/")[-1].split(".")[0].split("_")[-1])
+    output_folder_path = f"{PROCESSED_SALICON_PATH}/{sample_id}"
+    if is_already_processed(output_folder_path):
+        return
+
+    # Write image to processed sample folder
+    dst_frame_file_path = f"{output_folder_path}/frame.jpg"
+    os.makedirs(os.path.dirname(dst_frame_file_path), exist_ok=True)
+    frame = Image.open(frame_file_path).convert("RGB")
+    frame.save(dst_frame_file_path)
+
+    # Get gaze data
+    gaze_file_path = f"{RAW_SALICON_GAZES_PATH}/{os.path.basename(frame_file_path).replace('.jpg', '.mat')}"
+    if not os.path.exists(gaze_file_path):
+        return
     mat_data = loadmat(gaze_file_path)
     if "gaze" not in mat_data:
-        print(f"⚠️ No gaze data found in {gaze_file_path}.")
         return
     gaze_data = mat_data["gaze"]
-    sample_id = int(gaze_file_path.split("/")[-1].split(".")[0].split("_")[-1])
 
     # Process fixations
     fixation_data = []
     global_fixation_data = []
-    for subject_id, gaze_subject in enumerate(gaze_data):
+    for gaze_subject in gaze_data:
         # Get subject data an sort by timestamp
         gaze_subject = gaze_subject[0]
         subject_locations, subject_timestamps, subject_global_fixations = gaze_subject
@@ -287,7 +322,7 @@ def process_sample(
         print(f"❌ No global fixations found for sample {sample_id}.")
         return
 
-    # Get ground truths
+    # Get ground truths and global ground truth from fixations
     fixation_data = pd.DataFrame(fixation_data)
     saliency_maps = [
         get_saliency_map(
@@ -310,44 +345,27 @@ def process_sample(
     )
     global_ground_truth_from_fixations = (global_saliency_map * 255).astype(np.uint8)
 
-    # Get image
-    gaze_file_name = os.path.basename(gaze_file_path)
-    frame_file_path = (
-        f"{RAW_SALICON_IMAGES_PATH}/{gaze_file_name.replace('.mat', '.jpg')}"
-    )
-    global_ground_truth_file_path = (
-        f"{RAW_SALICON_GROUND_TRUTHS_PATH}/{gaze_file_name.replace('.mat', '.png')}"
-    )
-    frame = np.array(Image.open(frame_file_path).convert("RGB"))
-    global_ground_truth = np.array(
-        Image.open(global_ground_truth_file_path).convert("L")
-    )
-
-    # Save data
-    dst_frame_file_path = f"{PROCESSED_SALICON_PATH}/{sample_id}/frame.jpg"
-    dst_ground_truths_file_paths = [
-        f"{PROCESSED_SALICON_PATH}/{sample_id}/ground_truth_{i}.jpg"
-        for i in range(ground_truths.shape[0])
-    ]
-    dst_global_ground_truth_from_fixations_file_path = (
-        f"{PROCESSED_SALICON_PATH}/{sample_id}/global_ground_truth_from_fixations.jpg"
-    )
-    dst_global_ground_truth_file_path = (
-        f"{PROCESSED_SALICON_PATH}/{sample_id}/global_ground_truth.png"
-    )
-    os.makedirs(os.path.dirname(dst_frame_file_path), exist_ok=True)
-    os.makedirs(os.path.dirname(dst_ground_truths_file_paths[0]), exist_ok=True)
-    os.makedirs(
-        os.path.dirname(dst_global_ground_truth_from_fixations_file_path), exist_ok=True
-    )
+    # Write global ground truth to processed sample folder
+    dst_global_ground_truth_file_path = f"{output_folder_path}/global_ground_truth.jpg"
     os.makedirs(os.path.dirname(dst_global_ground_truth_file_path), exist_ok=True)
-    Image.fromarray(frame).save(dst_frame_file_path)
-    for i, ground_truth in enumerate(ground_truths):
-        Image.fromarray(ground_truth).save(dst_ground_truths_file_paths[i])
+    global_ground_truth_file_path = f"{RAW_SALICON_GROUND_TRUTHS_PATH}/{os.path.basename(frame_file_path).replace('.jpg', '.png')}"
+    global_ground_truth = Image.open(global_ground_truth_file_path).convert("L")
+    global_ground_truth.save(dst_global_ground_truth_file_path)
+
+    # Write global ground truth from fixations to processed sample folder
+    dst_global_ground_truth_from_fixations_file_path = (
+        f"{output_folder_path}/global_ground_truth_from_fixations.jpg"
+    )
+    os.makedirs(os.path.dirname(dst_global_ground_truth_from_fixations_file_path), exist_ok=True)
     Image.fromarray(global_ground_truth_from_fixations).save(
         dst_global_ground_truth_from_fixations_file_path
     )
-    Image.fromarray(global_ground_truth).save(dst_global_ground_truth_file_path)
+
+    # Write ground truths to processed sample folder
+    for i, ground_truth in enumerate(ground_truths):
+        dst_ground_truth_file_path = f"{output_folder_path}/ground_truth_{i}.jpg"
+        os.makedirs(os.path.dirname(dst_ground_truth_file_path), exist_ok=True)
+        Image.fromarray(ground_truth).save(dst_ground_truth_file_path)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -395,14 +413,9 @@ def main():
     min_n_fixations = args.min_n_fixations
     kde_bandwidth = args.kde_bandwidth
 
-    # Delete existing processed salicon fixations
-    if os.path.exists(PROCESSED_SALICON_PATH):
-        shutil.rmtree(PROCESSED_SALICON_PATH)
-        print("✅ Deleted existing salicon ground truths.")
-
     # Get gaze file paths for each sample
-    gaze_file_paths = get_paths_recursive(
-        folder_path=RAW_SALICON_GAZES_PATH, match_pattern="*.mat", path_type="f"
+    image_file_paths = get_paths_recursive(
+        folder_path=RAW_SALICON_IMAGES_PATH, match_pattern="*.jpg", path_type="f"
     )
 
     # Process fixations
@@ -410,17 +423,17 @@ def main():
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         args = [
             (
-                gaze_file_path,
+                image_file_path,
                 dispersion_threshold_px,
                 duration_threshold_ms,
                 min_n_fixations,
                 kde_bandwidth,
             )
-            for gaze_file_path in gaze_file_paths
+            for image_file_path in image_file_paths
         ]
         futures = executor.map(process_sample, *zip(*args))
         for _ in tqdm(
-            futures, total=len(gaze_file_paths), desc="⌛ Processing fixations..."
+            futures, total=len(image_file_paths), desc="⌛ Processing fixations..."
         ):
             pass
 
