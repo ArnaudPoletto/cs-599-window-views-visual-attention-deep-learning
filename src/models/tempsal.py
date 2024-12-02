@@ -156,14 +156,13 @@ class TempSAL(nn.Module):
             torch.Tensor: The temporal and global saliency maps.
         """
         if self.output_type == "global":
-            with torch.no_grad():
-                encoded_features_list, temporal_features, _ = (
-                    self._forward_temporal_pipeline(x)
-                )
+            encoded_features_list, temporal_features, _ = (
+                self._forward_temporal_pipeline(x)
+            )
             global_output = self._forward_global_pipeline(
                 encoded_features_list, temporal_features
             )
             return None, global_output
         else:
-            temporal_output = self._forward_temporal_pipeline(x)
+            _, _, temporal_output = self._forward_temporal_pipeline(x)
             return temporal_output, None

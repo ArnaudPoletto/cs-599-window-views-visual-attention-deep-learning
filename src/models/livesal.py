@@ -435,18 +435,12 @@ class LiveSAL(nn.Module):
         temporal_features = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
 
         return temporal_features
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if x.dim() not in [4, 5]:
-            raise ValueError(
-                f"❌ Input tensor must be of shape (batch_size, channels, height, width) or (batch_size, sequence_length, channels, height, width), got {x.shape}."
-            )
-        if x.dim() == 5 and x.shape[1] != SEQUENCE_LENGTH:
-            raise ValueError(
-                f"❌ Input tensor must have {SEQUENCE_LENGTH} channels, got {x.shape[1]}."
-            )
-        is_image = x.dim() == 4
-
+    
+    def _forward_temporal_pipeline(
+        self,
+        x: torch.Tensor,
+        is_image: bool,
+    ):
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
 
@@ -493,10 +487,28 @@ class LiveSAL(nn.Module):
         temporal_output = self.sigmoid(temporal_features)
         temporal_output = self._normalize_spatial_dimensions(temporal_output)
 
-        # Get global output if required
+        return temporal_features, temporal_output
+
+    def _forward_global_pipeline(self, temporal_features: torch.Tensor):
+        global_output = self.final_global_layer(temporal_features)
+        global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.dim() not in [4, 5]:
+            raise ValueError(
+                f"❌ Input tensor must be of shape (batch_size, channels, height, width) or (batch_size, sequence_length, channels, height, width), got {x.shape}."
+            )
+        if x.dim() == 5 and x.shape[1] != SEQUENCE_LENGTH:
+            raise ValueError(
+                f"❌ Input tensor must have {SEQUENCE_LENGTH} channels, got {x.shape[1]}."
+            )
+        is_image = x.dim() == 4
+
         if self.output_type == "global":
-            global_output = self.final_global_layer(temporal_features)
-            global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
+            with torch.no_grad():
+                temporal_features, _ = self._forward_temporal_pipeline(x, is_image)
+            global_output = self._forward_global_pipeline(temporal_features)
             return None, global_output
         else:
+            _, temporal_output = self._forward_temporal_pipeline(x, is_image)
             return temporal_output, None
