@@ -4,8 +4,9 @@ from pathlib import Path
 GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
-import random
+import os
 import torch
+import random
 import numpy as np
 from PIL import Image
 from natsort import natsorted
@@ -95,15 +96,22 @@ class SaliconDataset(Dataset):
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, np.ndarray, np.ndarray]:
         sample_folder_path = self.sample_folder_paths[index]
 
-        # Get frames and ground truths and apply transforms
+        # Get frame
         frame_file_path = f"{sample_folder_path}/frame.jpg"
+        frame = Image.open(frame_file_path).convert("RGB")
+        frame = TF.to_tensor(frame).float()
+
+        # Get ground truths if available...
         ground_truth_file_paths = get_paths_recursive(
             sample_folder_path, match_pattern="ground_truth_*.jpg", path_type="f"
         )
         ground_truth_file_paths = natsorted(ground_truth_file_paths)
         global_ground_truth_file_path = f"{sample_folder_path}/global_ground_truth.png"
 
-        frame = Image.open(frame_file_path).convert("RGB")
+        # ...otherwise return the frame only, typically for the challenge test set
+        if len(ground_truth_file_paths) == 0 or not os.path.exists(global_ground_truth_file_path):
+            return frame, None, None
+
         ground_truths = [
                 Image.open(output_file_path).convert("L")
                 for output_file_path in ground_truth_file_paths
@@ -112,7 +120,6 @@ class SaliconDataset(Dataset):
         frame, ground_truths, global_ground_truth = self._apply_transforms(frame, ground_truths, global_ground_truth)
 
         # Convert to torch tensors and normalize ground truths
-        frame = TF.to_tensor(frame).float()
         ground_truths = [TF.to_tensor(ground_truth).float() for ground_truth in ground_truths]
         ground_truths = [ground_truth / ground_truth.max() for ground_truth in ground_truths]
         ground_truths = torch.stack(ground_truths, axis=0).squeeze(1)
@@ -152,11 +159,18 @@ class SaliconDataModule(pl.LightningDataModule):
     def _get_challenge_split_dict(self):
         image_file_paths = get_paths_recursive(RAW_SALICON_IMAGES_PATH, match_pattern="*.jpg", path_type="f")
         image_file_paths = natsorted(image_file_paths)
-        challenge_split_dict = {"train": [], "val": []}
+        challenge_split_dict = {"train": [], "val": [], "test": []}
         for image_file_path in image_file_paths:
-            is_train_category = "train" in image_file_path.split("/")[-1]
-            category = "train" if is_train_category else "val"
-            sample_id = int(image_file_path.split("/")[-1].split(".")[0].split("_")[-1])
+            image_file_name = os.path.basename(image_file_path)
+            category = "test"
+            if "train" in image_file_name:
+                category = "train"
+            elif "val" in image_file_name:
+                category = "val"
+            else:
+                category = "test"
+
+            sample_id = int(image_file_name.split(".")[0].split("_")[-1])
             sample_folder_path = f"{PROCESSED_SALICON_PATH}/{sample_id}"
             challenge_split_dict[category].append(sample_folder_path)
 
@@ -177,7 +191,7 @@ class SaliconDataModule(pl.LightningDataModule):
             challenge_split_dict = self._get_challenge_split_dict()
             train_sample_folder_paths = challenge_split_dict["train"]
             val_sample_folder_paths = challenge_split_dict["val"]
-            test_sample_folder_paths = []
+            test_sample_folder_paths = challenge_split_dict["test"]
         else:
             print("📚 Using the custom split.")
             # Split indices

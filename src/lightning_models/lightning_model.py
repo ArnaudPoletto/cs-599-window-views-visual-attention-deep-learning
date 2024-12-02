@@ -70,6 +70,12 @@ class LightningModel(pl.LightningModule):
         if temporal_output is not None and temporal_targets is not None:
             temporal_loss = self.criterion(temporal_output, temporal_targets)
         if global_output is not None and global_targets is not None:
+            from matplotlib import pyplot as plt
+            plt.subplot(1, 2, 1)
+            plt.imshow(global_output[0].detach().cpu().numpy())
+            plt.subplot(1, 2, 2)
+            plt.imshow(global_targets[0].detach().cpu().numpy())
+            plt.show()
             global_loss = self.criterion(global_output, global_targets)
             
         return (
