@@ -158,7 +158,7 @@ def main() -> None:
             name="tempsal",
             dataset="salicon",
         )
-        print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}")
+        print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}.")
     else:
         lightning_model = LightningModel(
             model=model,
