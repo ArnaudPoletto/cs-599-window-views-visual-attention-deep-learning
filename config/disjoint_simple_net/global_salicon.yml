@@ -5,6 +5,7 @@ weight_decay: 1e-6
 batch_size: 4
 evaluation_steps: 64
 splits: [0.7, 0.15, 0.15]
+use_challenge_split: True
 save_model: True
 with_transforms: True
 

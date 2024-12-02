@@ -13,15 +13,16 @@ from PIL import Image
 from tqdm import tqdm
 import multiprocessing
 from scipy.io import loadmat
-from typing import List, Dict
+from typing import List, Dict, Optional
 from scipy.stats import gaussian_kde
 from concurrent.futures import ProcessPoolExecutor
 
 from src.utils.file import get_paths_recursive
 from src.config import (
     RAW_SALICON_GAZES_PATH,
-    RAW_SALICON_IMAGES_PATH,
     PROCESSED_SALICON_PATH,
+    RAW_SALICON_IMAGES_PATH,
+    RAW_SALICON_GROUND_TRUTHS_PATH,
 )
 
 SALICON_HEIGHT = 480
@@ -32,7 +33,7 @@ N_MSEC_IN_SEC = 1000
 DEFAULT_DISPERSION_THRESHOLD_PX = 25
 DEFAULT_DURATION_THRESHOLD_MS = 100
 DEFAULT_MIN_N_FIXATIONS = 5
-DEFAULT_KDE_BANDWIDTH = 0.4
+DEFAULT_KDE_BANDWIDTH = 0.2
 
 
 def get_dispersion(
@@ -81,8 +82,8 @@ def get_dispersion(
 
 def get_saliency_map(
     fixation_data: pd.DataFrame,
-    start_frame: int,
-    end_frame: int,
+    start_frame: Optional[int],
+    end_frame: Optional[int],
     kde_bandwidth: float,
     min_n_fixations: int,
     height: int = SALICON_HEIGHT,
@@ -93,8 +94,8 @@ def get_saliency_map(
 
     Args:
         fixation_data (pd.DataFrame): The fixation data.
-        start_frame (int): The start frame.
-        end_frame (int): The end frame.
+        start_frame (Optional[int]): The start frame.
+        end_frame (Optional[int]): The end frame.
         kde_bandwidth (float): The bandwidth for the kernel density estimation.
         min_n_fixations (int): The minimum number of fixations required to generate a saliency map.
         width (int, optional): The width of the saliency map. Defaults to SALICON_WIDTH.
@@ -123,9 +124,16 @@ def get_saliency_map(
         raise ValueError("❌ The height of the saliency map must be greater than zero.")
 
     fixation_data = fixation_data.copy()
-    fixation_data["FrameId"] = fixation_data["TimeSinceStart_ms"] // N_MSEC_IN_SEC
-    fixation_data = fixation_data[fixation_data["FrameId"] >= start_frame]
-    fixation_data = fixation_data[fixation_data["FrameId"] < end_frame]
+    if "TimeSinceStart_ms" in fixation_data.columns:
+        fixation_data["FrameId"] = fixation_data["TimeSinceStart_ms"] // N_MSEC_IN_SEC
+        if start_frame is not None:
+            fixation_data = fixation_data[fixation_data["FrameId"] >= start_frame]
+        if end_frame is not None:
+            fixation_data = fixation_data[fixation_data["FrameId"] < end_frame]
+    elif start_frame is not None or end_frame is not None:
+        print(
+            "⚠️ Start and end frames are ignored as TimeSinceStart_ms colum is not present in the fixation data."
+        )
 
     # Get ground truth distribution
     x_coords = fixation_data["X_px"].values
@@ -244,10 +252,11 @@ def process_sample(
 
     # Process fixations
     fixation_data = []
+    global_fixation_data = []
     for subject_id, gaze_subject in enumerate(gaze_data):
         # Get subject data an sort by timestamp
         gaze_subject = gaze_subject[0]
-        subject_locations, subject_timestamps, _ = gaze_subject
+        subject_locations, subject_timestamps, subject_global_fixations = gaze_subject
         subject_df = pd.DataFrame(
             {
                 "Timestamp_ms": subject_timestamps[:, 0],
@@ -265,10 +274,17 @@ def process_sample(
             dispersion_threshold_px=dispersion_threshold_px,
             duration_threshold_ms=duration_threshold_ms,
         )
+        subject_global_fixation_data = [
+            {"X_px": x, "Y_px": y} for x, y in subject_global_fixations
+        ]
         fixation_data.extend(subject_fixation_data)
+        global_fixation_data.extend(subject_global_fixation_data)
 
     if len(fixation_data) == 0:
         print(f"❌ No fixations found for sample {sample_id}.")
+        return
+    if len(global_fixation_data) == 0:
+        print(f"❌ No global fixations found for sample {sample_id}.")
         return
 
     # Get ground truths
@@ -284,15 +300,28 @@ def process_sample(
         for start_frame in range(0, DURATION_N_FRAME)
     ]
     ground_truths = (np.array(saliency_maps) * 255).astype(np.uint8)
+    global_fixation_data = pd.DataFrame(global_fixation_data)
+    global_saliency_map = get_saliency_map(
+        fixation_data=global_fixation_data,
+        start_frame=None,
+        end_frame=None,
+        kde_bandwidth=kde_bandwidth,
+        min_n_fixations=min_n_fixations,
+    )
+    global_ground_truth_from_fixations = (global_saliency_map * 255).astype(np.uint8)
 
     # Get image
     gaze_file_name = os.path.basename(gaze_file_path)
     frame_file_path = (
         f"{RAW_SALICON_IMAGES_PATH}/{gaze_file_name.replace('.mat', '.jpg')}"
     )
-    frame = np.array(Image.open(frame_file_path))
-    if len(frame.shape) == 2:
-        frame = np.stack([frame] * 3, axis=-1)
+    global_ground_truth_file_path = (
+        f"{RAW_SALICON_GROUND_TRUTHS_PATH}/{gaze_file_name.replace('.mat', '.png')}"
+    )
+    frame = np.array(Image.open(frame_file_path).convert("RGB"))
+    global_ground_truth = np.array(
+        Image.open(global_ground_truth_file_path).convert("L")
+    )
 
     # Save data
     dst_frame_file_path = f"{PROCESSED_SALICON_PATH}/{sample_id}/frame.jpg"
@@ -300,11 +329,25 @@ def process_sample(
         f"{PROCESSED_SALICON_PATH}/{sample_id}/ground_truth_{i}.jpg"
         for i in range(ground_truths.shape[0])
     ]
+    dst_global_ground_truth_from_fixations_file_path = (
+        f"{PROCESSED_SALICON_PATH}/{sample_id}/global_ground_truth_from_fixations.jpg"
+    )
+    dst_global_ground_truth_file_path = (
+        f"{PROCESSED_SALICON_PATH}/{sample_id}/global_ground_truth.png"
+    )
     os.makedirs(os.path.dirname(dst_frame_file_path), exist_ok=True)
     os.makedirs(os.path.dirname(dst_ground_truths_file_paths[0]), exist_ok=True)
+    os.makedirs(
+        os.path.dirname(dst_global_ground_truth_from_fixations_file_path), exist_ok=True
+    )
+    os.makedirs(os.path.dirname(dst_global_ground_truth_file_path), exist_ok=True)
     Image.fromarray(frame).save(dst_frame_file_path)
     for i, ground_truth in enumerate(ground_truths):
         Image.fromarray(ground_truth).save(dst_ground_truths_file_paths[i])
+    Image.fromarray(global_ground_truth_from_fixations).save(
+        dst_global_ground_truth_from_fixations_file_path
+    )
+    Image.fromarray(global_ground_truth).save(dst_global_ground_truth_file_path)
 
 
 def parse_arguments() -> argparse.Namespace:

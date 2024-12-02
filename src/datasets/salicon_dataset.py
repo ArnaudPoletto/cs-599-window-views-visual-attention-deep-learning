@@ -17,7 +17,7 @@ from torchvision.transforms import functional as TF
 
 from src.utils.random import set_seed
 from src.utils.file import get_paths_recursive
-from src.config import IMAGE_SIZE
+from src.config import IMAGE_SIZE, RAW_SALICON_IMAGES_PATH, PROCESSED_SALICON_PATH
 
 
 class SaliconDataset(Dataset):
@@ -39,13 +39,17 @@ class SaliconDataset(Dataset):
         return len(self.sample_folder_paths)
 
     def _apply_transforms(
-        self, frame: np.ndarray, ground_truths: List[np.ndarray]
+        self, 
+        frame: np.ndarray, 
+        ground_truths: List[np.ndarray],
+        global_ground_truth: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
         # Resize frames and ground truths
         frame = TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
         ground_truths = [
             TF.resize(gt, (IMAGE_SIZE, IMAGE_SIZE)) for gt in ground_truths
         ]
+        global_ground_truth = TF.resize(global_ground_truth, (IMAGE_SIZE, IMAGE_SIZE))
 
         if self.with_transforms:
             do_flip = random.random() > 0.5
@@ -65,6 +69,7 @@ class SaliconDataset(Dataset):
                     ground_truth = TF.hflip(ground_truth)
                     transformed_ground_truths.append(ground_truth)
                 ground_truths = transformed_ground_truths
+                global_ground_truth = TF.hflip(global_ground_truth)
 
             # Apply rotation
             if do_rotate:
@@ -74,6 +79,7 @@ class SaliconDataset(Dataset):
                     ground_truth = TF.rotate(ground_truth, angle, fill=0)
                     transformed_ground_truths.append(ground_truth)
                 ground_truths = transformed_ground_truths
+                global_ground_truth = TF.rotate(global_ground_truth, angle, fill=0)
 
             # Apply color transforms
             frame = TF.adjust_brightness(frame, brightness_factor)
@@ -84,37 +90,34 @@ class SaliconDataset(Dataset):
             # Apply Gaussian blur
             frame = TF.gaussian_blur(frame, kernel_size=3, sigma=sigma)
 
-        return frame, ground_truths
+        return frame, ground_truths, global_ground_truth
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, np.ndarray, np.ndarray]:
         sample_folder_path = self.sample_folder_paths[index]
 
         # Get frames and ground truths and apply transforms
         frame_file_path = f"{sample_folder_path}/frame.jpg"
-        output_file_paths = get_paths_recursive(
+        ground_truth_file_paths = get_paths_recursive(
             sample_folder_path, match_pattern="ground_truth_*.jpg", path_type="f"
         )
-        output_file_paths = natsorted(output_file_paths)
+        ground_truth_file_paths = natsorted(ground_truth_file_paths)
+        global_ground_truth_file_path = f"{sample_folder_path}/global_ground_truth.png"
+
         frame = Image.open(frame_file_path).convert("RGB")
         ground_truths = [
                 Image.open(output_file_path).convert("L")
-                for output_file_path in output_file_paths
+                for output_file_path in ground_truth_file_paths
             ]
-        frame, ground_truths = self._apply_transforms(frame, ground_truths)
+        global_ground_truth = Image.open(global_ground_truth_file_path).convert("L")
+        frame, ground_truths, global_ground_truth = self._apply_transforms(frame, ground_truths, global_ground_truth)
 
-        # Convert to torch tensors
+        # Convert to torch tensors and normalize ground truths
         frame = TF.to_tensor(frame).float()
         ground_truths = [TF.to_tensor(ground_truth).float() for ground_truth in ground_truths]
+        ground_truths = [ground_truth / ground_truth.max() for ground_truth in ground_truths]
         ground_truths = torch.stack(ground_truths, axis=0).squeeze(1)
-
-        # Get global ground truth
-        global_ground_truth = torch.mean(ground_truths, axis=0)
-        min_val = global_ground_truth.min()
-        max_val = global_ground_truth.max()
-        if min_val == max_val:
-            global_ground_truth = torch.zeros_like(global_ground_truth)
-        else:
-            global_ground_truth = (global_ground_truth - min_val) / (max_val - min_val)
+        global_ground_truth = TF.to_tensor(global_ground_truth).float().squeeze(0)
+        global_ground_truth = global_ground_truth / global_ground_truth.max()
 
         return frame, ground_truths, global_ground_truth
 
@@ -126,6 +129,7 @@ class SaliconDataModule(pl.LightningDataModule):
         train_split: float,
         val_split: float,
         test_split: float,
+        use_challenge_split: bool,
         with_transforms: bool,
         n_workers: int,
         seed: Optional[int] = None
@@ -136,6 +140,7 @@ class SaliconDataModule(pl.LightningDataModule):
         self.train_split = train_split
         self.val_split = val_split
         self.test_split = test_split
+        self.use_challenge_split = use_challenge_split
         self.with_transforms = with_transforms
         self.n_workers = n_workers
         self.seed = seed
@@ -144,6 +149,19 @@ class SaliconDataModule(pl.LightningDataModule):
         self.val_dataset: Optional[Dataset] = None
         self.test_dataset: Optional[Dataset] = None
 
+    def _get_challenge_split_dict(self):
+        image_file_paths = get_paths_recursive(RAW_SALICON_IMAGES_PATH, match_pattern="*.jpg", path_type="f")
+        image_file_paths = natsorted(image_file_paths)
+        challenge_split_dict = {"train": [], "val": []}
+        for image_file_path in image_file_paths:
+            is_train_category = "train" in image_file_path.split("/")[-1]
+            category = "train" if is_train_category else "val"
+            sample_id = int(image_file_path.split("/")[-1].split(".")[0].split("_")[-1])
+            sample_folder_path = f"{PROCESSED_SALICON_PATH}/{sample_id}"
+            challenge_split_dict[category].append(sample_folder_path)
+
+        return challenge_split_dict
+    
     def setup(self, stage: Optional[str] = None):
         if not np.isclose(self.train_split + self.val_split + self.test_split, 1.0):
             raise ValueError(
@@ -154,33 +172,47 @@ class SaliconDataModule(pl.LightningDataModule):
             print(f"🌱 Setting the seed to {self.seed} for generating dataloaders.")
             set_seed(self.seed)
 
-        # Split indices
-        sample_indices = np.arange(len(self.sample_folder_paths))
-        np.random.shuffle(sample_indices)
+        if self.use_challenge_split:
+            print("📚 Using the SALICON challenge split.")
+            challenge_split_dict = self._get_challenge_split_dict()
+            train_sample_folder_paths = challenge_split_dict["train"]
+            val_sample_folder_paths = challenge_split_dict["val"]
+            test_sample_folder_paths = []
+        else:
+            print("📚 Using the custom split.")
+            # Split indices
+            sample_indices = np.arange(len(self.sample_folder_paths))
+            np.random.shuffle(sample_indices)
 
-        train_samples = int(self.train_split * len(sample_indices))
-        val_samples = int(self.val_split * len(sample_indices))
+            train_samples = int(self.train_split * len(sample_indices))
+            val_samples = int(self.val_split * len(sample_indices))
 
-        train_indices = sample_indices[:train_samples]
-        val_indices = sample_indices[train_samples : train_samples + val_samples]
-        test_indices = sample_indices[train_samples + val_samples :]
+            train_indices = sample_indices[:train_samples]
+            val_indices = sample_indices[train_samples : train_samples + val_samples]
+            test_indices = sample_indices[train_samples + val_samples :]
+
+            train_sample_folder_paths = [self.sample_folder_paths[i] for i in train_indices]
+            val_sample_folder_paths = [self.sample_folder_paths[i] for i in val_indices]
+            test_sample_folder_paths = [self.sample_folder_paths[i] for i in test_indices]
 
         # Create datasets
         if stage == "fit" or stage is None:
             self.train_dataset = SaliconDataset(
-                sample_folder_paths=[self.sample_folder_paths[i] for i in train_indices],
+                sample_folder_paths=train_sample_folder_paths,
                 with_transforms=self.with_transforms,
             )
             self.val_dataset = SaliconDataset(
-                sample_folder_paths=[self.sample_folder_paths[i] for i in val_indices],
+                sample_folder_paths=val_sample_folder_paths,
                 with_transforms=False,
             )
             
         if stage == "test" or stage is None:
             self.test_dataset = SaliconDataset(
-                sample_folder_paths=[self.sample_folder_paths[i] for i in test_indices],
+                sample_folder_paths=test_sample_folder_paths,
                 with_transforms=False,
             )
+
+        print(f"📊 Setup Datasets with sizes: \n\tTrain: {len(self.train_dataset)} \n\tValidation: {len(self.val_dataset)} \n\tTest: {len(self.test_dataset)}")
 
     def train_dataloader(self):
         return DataLoader(

@@ -38,6 +38,7 @@ def _get_data_module(
     train_split: float,
     val_split: float,
     test_split: float,
+    use_challenge_split: bool,
     with_transforms: bool,
 ) -> SaliconDataModule | DHF1KDataModule:
     """
@@ -64,6 +65,7 @@ def _get_data_module(
             train_split=train_split,
             val_split=val_split,
             test_split=test_split,
+            use_challenge_split=use_challenge_split,
             with_transforms=with_transforms,
             n_workers=N_WORKERS,
             seed=SEED,
@@ -140,6 +142,7 @@ def main() -> None:
     batch_size = int(config["batch_size"])
     evaluation_steps = int(config["evaluation_steps"])
     splits = tuple(map(float, config["splits"]))
+    use_challenge_split = bool(config["use_challenge_split"])
     save_model = bool(config["save_model"])
     with_transforms = bool(config["with_transforms"])
     freeze_encoder = bool(config["freeze_encoder"])
@@ -156,6 +159,7 @@ def main() -> None:
         train_split=splits[0],
         val_split=splits[1],
         test_split=splits[2],
+        use_challenge_split=use_challenge_split,
         with_transforms=with_transforms,
     )
 
