@@ -188,6 +188,7 @@ class SaliconDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.n_workers,
             pin_memory=True,
+            persistent_workers=True,
             drop_last=True,
         )
 
@@ -206,4 +207,5 @@ class SaliconDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.n_workers,
             pin_memory=True,
+            persistent_workers=True,
         )

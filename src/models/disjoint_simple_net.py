@@ -115,7 +115,12 @@ class DisjointSimpleNet(nn.Module):
             encoded_features_list = image_encoder(x_image_i)
             decoded_features = image_decoder(encoded_features_list)
             decoded_features_list.append(decoded_features)
+            del encoded_features_list
+            torch.cuda.empty_cache()
+
         temporal_features = torch.stack(decoded_features_list, dim=1).squeeze(2)
+        del decoded_features_list
+        torch.cuda.empty_cache()
 
         # Compute the output
         if self.output_type == "global":
