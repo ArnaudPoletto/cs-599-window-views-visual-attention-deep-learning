@@ -15,11 +15,11 @@ hidden_channels: 64
 neighbor_radius: 1
 n_iterations: 3
 depth_integration: "late" #"early", "late", "both"
+output_type: "global"
 dropout_rate: 0.2
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True
 with_graph_directional_kernels: True
 with_depth_information: True
-output_type: "global"
 with_checkpoint: True

@@ -143,7 +143,7 @@ def main() -> None:
         output_type=output_type,
     )
     if with_checkpoint:
-        checkpoint_file_path = f"{CHECKPOINTS_PATH}/tempsal_checkpoint.ckpt"
+        checkpoint_file_path = f"{CHECKPOINTS_PATH}/tempsal_temporal.ckpt"
         if not os.path.exists(checkpoint_file_path):
             raise FileNotFoundError(f"❌ File {Path(checkpoint_file_path).resolve()} not found.")
         lightning_model = LightningModel.load_from_checkpoint(

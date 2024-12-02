@@ -25,6 +25,7 @@ from src.config import (
     N_WORKERS,
     MODELS_PATH,
     CONFIG_PATH,
+    CHECKPOINTS_PATH,
     PROCESSED_DHF1K_PATH,
     PROCESSED_SALICON_PATH,
 )
@@ -186,7 +187,7 @@ def main() -> None:
     )
     if with_checkpoint:
         lightning_model = LightningModel.load_from_checkpoint(
-            checkpoint_path=f"{MODELS_PATH}/livesal/20210824-221529_livesal/epoch=0-val_loss=0.00.ckpt",
+            checkpoint_path=f"{CHECKPOINTS_PATH}/livesal_temporal.ckpt",
             model=model,
             learning_rate=learning_rate,
             weight_decay=weight_decay,
