@@ -21,15 +21,20 @@ class LiveSAL(nn.Module):
         neighbor_radius: int,
         n_iterations: int,
         depth_integration: str,
+        output_type: str,
         dropout_rate: float,
         with_graph_processing: bool,
         with_graph_edge_features: bool,
         with_graph_positional_embeddings: bool,
         with_graph_directional_kernels: bool,
         with_depth_information: bool,
-        with_global_output: bool,
         eps: float = 1e-6,
     ) -> None:
+        if output_type not in ["temporal", "global"]:
+            raise ValueError(f"❌ Invalid output type: {output_type}")
+        if freeze_temporal_pipeline and output_type == "temporal":
+            raise ValueError("❌ Cannot freeze the temporal pipeline when output type is temporal.")
+        
         super(LiveSAL, self).__init__()
 
         self.image_n_levels = image_n_levels
@@ -45,7 +50,7 @@ class LiveSAL(nn.Module):
         self.with_graph_positional_embeddings = with_graph_positional_embeddings
         self.with_graph_directional_kernels = with_graph_directional_kernels
         self.with_depth_information = with_depth_information
-        self.with_global_output = with_global_output
+        self.output_type = output_type
         self.eps = eps
 
         # Get normalization parameters for encoder/estimator inputs
@@ -206,25 +211,24 @@ class LiveSAL(nn.Module):
             ),
         )
 
-        if with_global_output:
-            self.final_global_layer = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=SEQUENCE_LENGTH,
-                    out_channels=SEQUENCE_LENGTH,
-                    kernel_size=5,
-                    padding=2,
-                    bias=True,
-                ),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(
-                    in_channels=SEQUENCE_LENGTH,
-                    out_channels=1,
-                    kernel_size=5,
-                    padding=2,
-                    bias=True,
-                ),
-                nn.Sigmoid(),
-            )
+        self.final_global_layer = nn.Sequential(
+            nn.Conv2d(
+                in_channels=SEQUENCE_LENGTH,
+                out_channels=SEQUENCE_LENGTH,
+                kernel_size=5,
+                padding=2,
+                bias=True,
+            ),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels=SEQUENCE_LENGTH,
+                out_channels=1,
+                kernel_size=5,
+                padding=2,
+                bias=True,
+            ),
+            nn.Sigmoid(),
+        )
 
         self.sigmoid = nn.Sigmoid()
 
@@ -237,6 +241,10 @@ class LiveSAL(nn.Module):
             for param in self.temporal_layers.parameters():
                 param.requires_grad = False
             for param in self.final_temporal_layer.parameters():
+                param.requires_grad = False
+
+        if self.output_type == "temporal":
+            for param in self.final_global_layer.parameters():
                 param.requires_grad = False
 
     def _get_num_groups(num_channels, max_groups):
@@ -486,7 +494,7 @@ class LiveSAL(nn.Module):
         temporal_output = self._normalize_spatial_dimensions(temporal_output)
 
         # Get global output if required
-        if self.with_global_output:
+        if self.output_type == "global":
             global_output = self.final_global_layer(temporal_features)
             global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
         else:

@@ -295,6 +295,17 @@ class ViDaS(nn.Module):
             torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1),
             persistent=False,
         )
+        if with_depth_information:
+            self.register_buffer(
+                "depth_mean",
+                torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1),
+                persistent=False,
+            )
+            self.register_buffer(
+                "depth_std",
+                torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1),
+                persistent=False,
+            )
 
         if with_depth_information:
             self.depth_estimator = DepthEstimator(freeze=True)
@@ -313,17 +324,6 @@ class ViDaS(nn.Module):
             )
             self.depth_upsample = nn.Upsample(
                 size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
-            )
-
-            self.register_buffer(
-                "depth_mean",
-                torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1),
-                persistent=False,
-            )
-            self.register_buffer(
-                "depth_std",
-                torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1),
-                persistent=False,
             )
 
         final_layer_in_channels = saliency_out_channels
