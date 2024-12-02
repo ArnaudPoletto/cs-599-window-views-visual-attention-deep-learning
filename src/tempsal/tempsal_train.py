@@ -189,7 +189,7 @@ def main() -> None:
         devices=-1,
         num_nodes=n_nodes,
         precision="32",
-        strategy="fsdp" if torch.cuda.device_count() > 1 else "auto",
+        strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
         val_check_interval=evaluation_steps,
         logger=wandb_logger,
         callbacks=callbacks,

@@ -167,7 +167,7 @@ def main() -> None:
         output_type=output_type,
     )
     if with_checkpoint:
-        checkpoint_file_path = f"{CHECKPOINTS_PATH}/disjoint_simple_net_checkpoint.ckpt"
+        checkpoint_file_path = f"{CHECKPOINTS_PATH}/disjoint_simple_net_temporal.ckpt"
         if not os.path.exists(checkpoint_file_path):
             raise FileNotFoundError(f"❌ File {Path(checkpoint_file_path).resolve()} not found.")
         lightning_model = LightningModel.load_from_checkpoint(
@@ -213,7 +213,7 @@ def main() -> None:
         devices=-1,
         num_nodes=n_nodes,
         precision=32,
-        strategy="fsdp" if torch.cuda.device_count() > 1 else "auto",
+        strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
         val_check_interval=evaluation_steps,
         logger=wandb_logger,
         callbacks=callbacks,

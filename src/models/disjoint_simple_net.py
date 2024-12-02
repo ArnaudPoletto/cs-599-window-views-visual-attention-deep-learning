@@ -125,7 +125,7 @@ class DisjointSimpleNet(nn.Module):
         # Compute the output
         if self.output_type == "global":
             global_output = self.final_global_layer(temporal_features).squeeze(1)
-            return global_output, None
+            return None, global_output
         else:
             temporal_output = self.sigmoid(temporal_features)
             return temporal_output, None

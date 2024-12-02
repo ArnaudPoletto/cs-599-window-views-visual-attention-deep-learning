@@ -497,7 +497,6 @@ class LiveSAL(nn.Module):
         if self.output_type == "global":
             global_output = self.final_global_layer(temporal_features)
             global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
+            return None, global_output
         else:
-            global_output = None
-
-        return temporal_output, global_output
+            return temporal_output, None
