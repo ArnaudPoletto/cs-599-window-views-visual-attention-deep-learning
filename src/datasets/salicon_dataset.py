@@ -212,7 +212,13 @@ class SaliconDataModule(pl.LightningDataModule):
                 with_transforms=False,
             )
 
-        print(f"📊 Setup Datasets with sizes: \n\tTrain: {len(self.train_dataset)} \n\tValidation: {len(self.val_dataset)} \n\tTest: {len(self.test_dataset)}")
+        print(f"📊 Setup datasets with sizes:")
+        if self.train_dataset is not None:
+            print(f"  - Train: {len(self.train_dataset)} samples")
+        if self.val_dataset is not None:
+            print(f"  - Validation: {len(self.val_dataset)} samples")
+        if self.test_dataset is not None:
+            print(f"  - Test: {len(self.test_dataset)} samples")
 
     def train_dataloader(self):
         return DataLoader(
