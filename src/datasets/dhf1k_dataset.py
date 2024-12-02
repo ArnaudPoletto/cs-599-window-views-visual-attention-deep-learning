@@ -244,6 +244,7 @@ class DHF1KDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.n_workers,
             pin_memory=True,
+            persistent_workers=True,
         )
 
     def test_dataloader(self):

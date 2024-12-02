@@ -115,11 +115,11 @@ class DisjointSimpleNet(nn.Module):
             encoded_features_list = image_encoder(x_image_i)
             decoded_features = image_decoder(encoded_features_list)
             decoded_features_list.append(decoded_features)
-        temporal_features = torch.stack(decoded_features_list, dim=1)
+        temporal_features = torch.stack(decoded_features_list, dim=1).squeeze(2)
 
         # Compute the output
         if self.output_type == "global":
-            global_output = self.final_global_layer(temporal_features)
+            global_output = self.final_global_layer(temporal_features).squeeze(1)
             return global_output, None
         else:
             temporal_output = self.sigmoid(temporal_features)
