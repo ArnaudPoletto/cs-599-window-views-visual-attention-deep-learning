@@ -41,8 +41,10 @@ class TempSAL(nn.Module):
         if output_type not in ["temporal", "global"]:
             raise ValueError(f"❌ Invalid output type: {output_type}")
         if freeze_temporal_pipeline and output_type == "temporal":
-            raise ValueError("❌ Cannot freeze the temporal pipeline when output type is temporal.")
-        
+            raise ValueError(
+                "❌ Cannot freeze the temporal pipeline when output type is temporal."
+            )
+
         super(TempSAL, self).__init__()
 
         self.freeze_encoder = freeze_encoder
@@ -111,13 +113,38 @@ class TempSAL(nn.Module):
 
     def _normalize_spatial_dimensions(self, x: torch.Tensor) -> torch.Tensor:
         x = x.clone()
-        batch_size, channels , height, width = x.size()
+        batch_size, channels, height, width = x.size()
         x = x.view(batch_size, channels, -1)
         x = x / (x.max(dim=2, keepdim=True)[0] + self.eps)
         x = x.view(batch_size, channels, height, width)
 
         return x
-    
+
+    def _forward_temporal_pipeline(self, x: torch.Tensor) -> torch.Tensor:
+        # Encode the input image
+        x_image = self._normalize_input(x, self.image_mean, self.image_std)
+        encoded_features_list = self.image_encoder(x_image)
+
+        # Decode temporal features and get temporal output
+        temporal_features = self.temporal_decoder(encoded_features_list)
+        temporal_output = self.sigmoid(temporal_features)
+        temporal_output = self._normalize_spatial_dimensions(temporal_output)
+
+        return encoded_features_list, temporal_features, temporal_output
+
+    def _forward_global_pipeline(
+        self, encoded_features_list: torch.Tensor, temporal_features: torch.Tensor
+    ) -> torch.Tensor:
+        global_features = self.global_decoder(encoded_features_list)
+        global_output = self.spatio_temporal_mixing_module(
+            encoded_features_list=encoded_features_list,
+            temporal_features=temporal_features,
+            global_features=global_features,
+        )
+        global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
+
+        return global_output
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the TempSAL model.
@@ -128,24 +155,15 @@ class TempSAL(nn.Module):
         Returns:
             torch.Tensor: The temporal and global saliency maps.
         """
-        # Encode the input image
-        x_image = self._normalize_input(x, self.image_mean, self.image_std)
-        encoded_features_list = self.image_encoder(x_image)
-
-        # Decode temporal features and get temporal output
-        temporal_features = self.temporal_decoder(encoded_features_list)
-        temporal_output = self.sigmoid(temporal_features)
-        temporal_output = self._normalize_spatial_dimensions(temporal_output)
-
-        # Decode global features and get global output with spatio-temporal mixing module if needed
         if self.output_type == "global":
-            global_features = self.global_decoder(encoded_features_list)
-            global_output = self.spatio_temporal_mixing_module(
-                encoded_features_list=encoded_features_list,
-                temporal_features=temporal_features,
-                global_features=global_features,
+            with torch.no_grad():
+                encoded_features_list, temporal_features, _ = (
+                    self._forward_temporal_pipeline(x)
+                )
+            global_output = self._forward_global_pipeline(
+                encoded_features_list, temporal_features
             )
-            global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
             return None, global_output
         else:
+            temporal_output = self._forward_temporal_pipeline(x)
             return temporal_output, None
