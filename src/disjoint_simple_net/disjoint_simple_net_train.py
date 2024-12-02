@@ -15,11 +15,11 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
 from src.utils.random import set_seed
-from src.models.livesal import LiveSAL
 from src.utils.parser import get_config
 from src.utils.file import get_paths_recursive
 from src.datasets.dhf1k_dataset import DHF1KDataModule
 from src.datasets.salicon_dataset import SaliconDataModule
+from src.models.disjoint_simple_net import DisjointSimpleNet
 from src.lightning_models.lightning_model import LightningModel
 from src.config import (
     SEED,
@@ -95,7 +95,7 @@ def parse_arguments() -> argparse.Namespace:
     Returns:
         argparse.Namespace: The parsed arguments.
     """
-    parser = argparse.ArgumentParser(description="Process dataset sequences.")
+    parser = argparse.ArgumentParser(description="Train the DisjointSimpleNet model.")
 
     parser.add_argument(
         "--config-file-path",
@@ -103,7 +103,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/livesal/default.yml",
+        default=f"{CONFIG_PATH}/disjoint_simple_net/default.yml",
         help="The path to the config file.",
     )
 
@@ -120,7 +120,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> None:
     """
-    The main function to train the LiveSAL model.
+    The main function to train the DisjointSimpleNet model.
     """
     if platform.system() != "Windows":
         multiprocessing.set_start_method("forkserver", force=True)
@@ -142,20 +142,10 @@ def main() -> None:
     splits = tuple(map(float, config["splits"]))
     save_model = bool(config["save_model"])
     with_transforms = bool(config["with_transforms"])
-    image_n_levels = int(config["image_n_levels"])
-    hidden_channels = int(config["hidden_channels"])
-    neighbor_radius = int(config["neighbor_radius"])
-    n_iterations = int(config["n_iterations"])
-    with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
-    depth_integration = str(config["depth_integration"])
+    hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     output_type = str(config["output_type"])
-    dropout_rate = float(config["dropout_rate"])
-    with_graph_edge_features = bool(config["with_graph_edge_features"])
-    with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
-    with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
-    with_depth_information = bool(config["with_depth_information"])
     with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
@@ -170,24 +160,14 @@ def main() -> None:
     )
 
     # Get model
-    model = LiveSAL(
-        image_n_levels=image_n_levels,
+    model = DisjointSimpleNet(
         freeze_encoder=freeze_encoder,
         freeze_temporal_pipeline=freeze_temporal_pipeline,
-        hidden_channels=hidden_channels,
-        neighbor_radius=neighbor_radius,
-        n_iterations=n_iterations,
-        depth_integration=depth_integration,
+        hidden_channels_list=hidden_channels_list,
         output_type=output_type,
-        dropout_rate=dropout_rate,
-        with_graph_processing=with_graph_processing,
-        with_graph_edge_features=with_graph_edge_features,
-        with_graph_positional_embeddings=with_graph_positional_embeddings,
-        with_graph_directional_kernels=with_graph_directional_kernels,
-        with_depth_information=with_depth_information,
     )
     if with_checkpoint:
-        checkpoint_file_path = f"{CHECKPOINTS_PATH}/tempsal_checkpoint.ckpt"
+        checkpoint_file_path = f"{CHECKPOINTS_PATH}/disjoint_simple_net_checkpoint.ckpt"
         if not os.path.exists(checkpoint_file_path):
             raise FileNotFoundError(f"❌ File {Path(checkpoint_file_path).resolve()} not found.")
         lightning_model = LightningModel.load_from_checkpoint(
@@ -195,7 +175,7 @@ def main() -> None:
             model=model,
             learning_rate=learning_rate,
             weight_decay=weight_decay,
-            name="livesal",
+            name="disjoint_simple_net",
             dataset=dataset,
         )
     else:
@@ -203,12 +183,12 @@ def main() -> None:
             model=model,
             learning_rate=learning_rate,
             weight_decay=weight_decay,
-            name="livesal",
-            dataset=dataset,
+            name="disjoint_simple_net",
+            dataset=dataset
         )
 
     # Get trainer and train
-    wandb_name = f"{time.strftime('%Y%m%d-%H%M%S')}_livesal"
+    wandb_name = f"{time.strftime('%Y%m%d-%H%M%S')}_disjoint_simple_net"
     wandb_logger = WandbLogger(
         project="thesis",
         name=wandb_name,
@@ -217,7 +197,7 @@ def main() -> None:
 
     if save_model:
         checkpoint_callback = ModelCheckpoint(
-            dirpath=f"{MODELS_PATH}/livesal/{wandb_name}",
+            dirpath=f"{MODELS_PATH}/disjoint_simple_net/{wandb_name}",
             filename="{epoch}-{val_loss:.2f}",
             save_top_k=3,
             monitor="val_loss",
@@ -243,7 +223,6 @@ def main() -> None:
         model=lightning_model,
         datamodule=data_module,
     )
-
 
 if __name__ == "__main__":
     main()

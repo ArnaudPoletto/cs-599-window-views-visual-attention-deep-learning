@@ -1,0 +1,15 @@
+dataset: "salicon" # "salicon" | "dhf1k" 
+n_epochs: 10
+learning_rate: 1e-3
+weight_decay: 1e-6
+batch_size: 8
+evaluation_steps: 32
+splits: [0.7, 0.15, 0.15]
+save_model: True
+with_transforms: True
+
+freeze_encoder: True
+freeze_temporal_pipeline: True
+hidden_channels_list: [96, 270, 256, 512]
+output_type: "global"
+with_checkpoint: True

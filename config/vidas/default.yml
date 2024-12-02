@@ -3,7 +3,7 @@ learning_rate: 1e-3
 weight_decay: 1e-6
 batch_size: 8
 evaluation_steps: 32
-splits: [0.6, 0.3, 0.1]
+splits: [0.7, 0.15, 0.15]
 save_model: True
 with_transforms: True
 
