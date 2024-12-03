@@ -112,7 +112,7 @@ class SaliconDataset(Dataset):
                 for output_file_path in ground_truth_file_paths
             ]
         ground_truths = [
-            TF.resize(gt, (FINAL_HEIGHT, FINAL_WIDTH)) for gt in ground_truths
+            TF.resize(gt, (IMAGE_SIZE, IMAGE_SIZE)) for gt in ground_truths
         ]
         global_ground_truth = Image.open(global_ground_truth_file_path).convert("L")
         global_ground_truth = TF.resize(global_ground_truth, (FINAL_HEIGHT, FINAL_WIDTH))
