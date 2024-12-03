@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from typing import List
 
-from src.config import SEQUENCE_LENGTH, IMAGE_SIZE
+from src.config import SEQUENCE_LENGTH, IMAGE_SIZE, FINAL_HEIGHT, FINAL_WIDTH
 
 
 class SpatioTemporalMixingModule(nn.Module):
@@ -150,7 +150,7 @@ class SpatioTemporalMixingModule(nn.Module):
 
         # Get the final output
         output = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
+            x, size=(FINAL_HEIGHT, FINAL_WIDTH), mode="bicubic", align_corners=False
         )
         output = self.final_layer(output)
 

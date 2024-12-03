@@ -18,7 +18,7 @@ from torchvision.transforms import functional as TF
 
 from src.utils.random import set_seed
 from src.utils.file import get_paths_recursive
-from src.config import IMAGE_SIZE, RAW_SALICON_IMAGES_PATH, PROCESSED_SALICON_PATH
+from src.config import IMAGE_SIZE, RAW_SALICON_IMAGES_PATH, PROCESSED_SALICON_PATH, FINAL_HEIGHT, FINAL_WIDTH
 
 
 class SaliconDataset(Dataset):
@@ -112,10 +112,10 @@ class SaliconDataset(Dataset):
                 for output_file_path in ground_truth_file_paths
             ]
         ground_truths = [
-            TF.resize(gt, (IMAGE_SIZE, IMAGE_SIZE)) for gt in ground_truths
+            TF.resize(gt, (FINAL_HEIGHT, FINAL_WIDTH)) for gt in ground_truths
         ]
         global_ground_truth = Image.open(global_ground_truth_file_path).convert("L")
-        global_ground_truth = TF.resize(global_ground_truth, (IMAGE_SIZE, IMAGE_SIZE))
+        global_ground_truth = TF.resize(global_ground_truth, (FINAL_HEIGHT, FINAL_WIDTH))
         frame, ground_truths, global_ground_truth = self._apply_transforms(frame, ground_truths, global_ground_truth)
 
         # Convert to torch tensors and normalize ground truths
