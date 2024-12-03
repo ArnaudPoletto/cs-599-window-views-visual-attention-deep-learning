@@ -493,6 +493,8 @@ class LiveSAL(nn.Module):
         global_output = self.final_global_layer(temporal_features)
         global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
 
+        return global_output
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() not in [4, 5]:
             raise ValueError(
@@ -505,8 +507,7 @@ class LiveSAL(nn.Module):
         is_image = x.dim() == 4
 
         if self.output_type == "global":
-            with torch.no_grad():
-                temporal_features, _ = self._forward_temporal_pipeline(x, is_image)
+            temporal_features, _ = self._forward_temporal_pipeline(x, is_image)
             global_output = self._forward_global_pipeline(temporal_features)
             return None, global_output
         else:
