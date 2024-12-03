@@ -126,6 +126,7 @@ def main() -> None:
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     output_type = str(config["output_type"])
+    dropout_rate = float(config["dropout_rate"])
     with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
@@ -145,6 +146,7 @@ def main() -> None:
         freeze_temporal_pipeline=freeze_temporal_pipeline,
         hidden_channels_list=hidden_channels_list,
         output_type=output_type,
+        dropout_rate=dropout_rate,
     )
     if with_checkpoint:
         checkpoint_file_path = f"{CHECKPOINTS_PATH}/tempsal_temporal.ckpt"

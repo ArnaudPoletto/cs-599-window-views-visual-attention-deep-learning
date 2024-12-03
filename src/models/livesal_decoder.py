@@ -82,6 +82,7 @@ class LiveSALDecoder(nn.Module):
             ),
         )
 
+    @staticmethod
     def _get_num_groups(num_channels, max_groups):
         num_groups = min(max_groups, num_channels)
         while num_channels % num_groups != 0 and num_groups > 1:

@@ -97,6 +97,7 @@ class LiveSAL(nn.Module):
                 )
                 self.depth_decoder = DepthDecoder(
                     hidden_channels=hidden_channels,
+                    dropout_rate=dropout_rate,
                 )
 
         self.image_encoder = ImageEncoder(
@@ -174,6 +175,7 @@ class LiveSAL(nn.Module):
         self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
             hidden_channels_list=[hidden_channels] * image_n_levels,
             feature_channels_list=[hidden_channels] * image_n_levels,
+            dropout_rate=dropout_rate,
         )
 
         self.sigmoid = nn.Sigmoid()
@@ -200,6 +202,7 @@ class LiveSAL(nn.Module):
             for param in self.spatio_temporal_mixing_module.parameters():
                 param.requires_grad = False
 
+    @staticmethod
     def _get_num_groups(num_channels, max_groups):
         num_groups = min(max_groups, num_channels)
         while num_channels % num_groups != 0 and num_groups > 1:
@@ -393,6 +396,8 @@ class LiveSAL(nn.Module):
                     image_features=depth_encoded_features,
                     graph_processor=self.depth_graph_processor,
                 )
+            else:
+                depth_features = depth_encoded_features
             depth_decoded_features = self._get_depth_decoded_features(
                 depth_features=depth_features,
                 depth_skip_features_list=depth_skip_features_list,
@@ -419,9 +424,6 @@ class LiveSAL(nn.Module):
         global_features = self.global_decoder(pooled_image_features_list, pooled_depth_decoded_features)
 
         # Get global output from spatio-temporal mixing module
-        print("image_features_list", [image_features.shape for image_features in image_features_list])
-        print("temporal_features", temporal_features.shape)
-        print("global_features", global_features.shape)
         global_output = self.spatio_temporal_mixing_module(
             encoded_features_list=pooled_image_features_list,
             temporal_features=temporal_features,

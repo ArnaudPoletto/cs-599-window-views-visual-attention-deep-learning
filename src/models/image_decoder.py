@@ -22,6 +22,7 @@ class ImageDecoder(nn.Module):
         hidden_channels_list: List[int],
         features_sizes: List[int],
         output_channels: int,
+        dropout_rate: float,
         with_final_sigmoid: bool,
     ) -> None:
         """
@@ -39,6 +40,9 @@ class ImageDecoder(nn.Module):
         self.features_channels_list = features_channels_list
         self.hidden_channels_list = hidden_channels_list
         self.features_sizes = features_sizes
+        self.output_channels = output_channels
+        self.dropout_rate = dropout_rate
+        self.with_final_sigmoid = with_final_sigmoid
 
         # Get the decoder layers
         in_channels_list = [features_channels_list[-1]] + hidden_channels_list[1:][::-1]
@@ -58,6 +62,7 @@ class ImageDecoder(nn.Module):
                     ),
                     nn.GroupNorm(num_groups=ImageDecoder._get_num_groups(out_channels, 32), num_channels=out_channels),
                     nn.ReLU(inplace=True),
+                    nn.Dropout(p=dropout_rate),
                 )
                 for in_channels, inc_channels, out_channels in zip(
                     in_channels_list, inc_channels_list, out_channels_list
@@ -87,6 +92,7 @@ class ImageDecoder(nn.Module):
             nn.Sigmoid() if with_final_sigmoid else nn.Identity(),
         )
 
+    @staticmethod
     def _get_num_groups(num_channels, max_groups):
         num_groups = min(max_groups, num_channels)
         while num_channels % num_groups != 0 and num_groups > 1:

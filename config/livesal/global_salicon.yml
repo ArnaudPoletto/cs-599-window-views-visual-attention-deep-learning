@@ -1,7 +1,7 @@
 dataset: "salicon" # "salicon" | "dhf1k" 
 n_epochs: 10
 learning_rate: 1e-3
-weight_decay: 1e-6
+weight_decay: 1e-4
 batch_size: 8
 evaluation_steps: 32
 splits: [0.7, 0.15, 0.15]
@@ -17,7 +17,7 @@ neighbor_radius: 1
 n_iterations: 3
 depth_integration: "late" #"early", "late", "both"
 output_type: "global"
-dropout_rate: 0.2
+dropout_rate: 0.3
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True

@@ -15,6 +15,7 @@ class SpatioTemporalMixingModule(nn.Module):
         self,
         hidden_channels_list: List[int],
         feature_channels_list: List[int],
+        dropout_rate: float,
     ) -> None:
         """
         Initialize the spatio-temporal mixing module.
@@ -27,6 +28,7 @@ class SpatioTemporalMixingModule(nn.Module):
 
         self.hidden_channels_list = hidden_channels_list
         self.feature_channels_list = feature_channels_list
+        self.dropout_rate = dropout_rate
 
         # Get the decoder layers
         in_channels_list = [feature_channels_list[-1]] + hidden_channels_list[1:][::-1]
@@ -52,6 +54,7 @@ class SpatioTemporalMixingModule(nn.Module):
                         num_channels=out_channels,
                     ),
                     nn.ReLU(),
+                    nn.Dropout2d(p=dropout_rate),
                 )
                 for in_channels, inc_channels, out_channels in zip(
                     in_channels_list, inc_channels_list, out_channels_list
@@ -84,6 +87,7 @@ class SpatioTemporalMixingModule(nn.Module):
             nn.Sigmoid(),
         )
 
+    @staticmethod
     def _get_num_groups(num_channels, max_groups):
         num_groups = min(max_groups, num_channels)
         while num_channels % num_groups != 0 and num_groups > 1:

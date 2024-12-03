@@ -12,4 +12,5 @@ freeze_encoder: True
 freeze_temporal_pipeline: False
 hidden_channels_list: [96, 270, 256, 512]
 output_type: "temporal"
+dropout_rate: 0.1
 with_checkpoint: False

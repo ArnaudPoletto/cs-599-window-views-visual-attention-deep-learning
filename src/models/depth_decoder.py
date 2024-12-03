@@ -5,11 +5,17 @@ from src.config import IMAGE_SIZE
 
 
 class DepthDecoder(nn.Module):
-    def __init__(self, hidden_channels: int):
+    def __init__(
+        self, 
+        hidden_channels: int,
+        dropout_rate: float,
+    ) -> None:
         if hidden_channels % 2 != 0:
             raise ValueError("❌ Hidden channels must be divisible by 2.")
         
         super(DepthDecoder, self).__init__()
+
+        self.dropout_rate = dropout_rate
 
         self.up1 = nn.Sequential(
             nn.ConvTranspose2d(
@@ -23,6 +29,7 @@ class DepthDecoder(nn.Module):
             ),
             nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels // 2, 16), num_channels=hidden_channels // 2),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(p=dropout_rate),
         )
 
         # After concatenation with skip connection, input channels double
@@ -36,6 +43,7 @@ class DepthDecoder(nn.Module):
             ),
             nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(p=dropout_rate),
         )
 
         self.up2 = nn.Sequential(
@@ -50,6 +58,7 @@ class DepthDecoder(nn.Module):
             ),
             nn.GroupNorm(num_groups=DepthDecoder._get_num_groups(hidden_channels // 2, 16), num_channels=hidden_channels // 2),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(p=dropout_rate),
         )
 
         # After concatenation with skip connection, input channels double
@@ -79,6 +88,7 @@ class DepthDecoder(nn.Module):
             nn.ReLU(inplace=True),
         )
 
+    @staticmethod
     def _get_num_groups(num_channels, max_groups):
         num_groups = min(max_groups, num_channels)
         while num_channels % num_groups != 0 and num_groups > 1:

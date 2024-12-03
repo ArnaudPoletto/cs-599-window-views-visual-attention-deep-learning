@@ -32,6 +32,7 @@ class TempSAL(nn.Module):
         freeze_temporal_pipeline: bool,
         hidden_channels_list: List[int],
         output_type: str,
+        dropout_rate: float,
         eps: float = 1e-6,
     ) -> None:
         """
@@ -54,6 +55,7 @@ class TempSAL(nn.Module):
         self.freeze_temporal_pipeline = freeze_temporal_pipeline
         self.hidden_channels_list = hidden_channels_list
         self.output_type = output_type
+        self.dropout_rate = dropout_rate
         self.eps = eps
 
         # Get normalization parameters for encoder inputs
@@ -77,6 +79,7 @@ class TempSAL(nn.Module):
             hidden_channels_list=hidden_channels_list,
             features_sizes=self.image_encoder.feature_sizes,
             output_channels=SEQUENCE_LENGTH,
+            dropout_rate=dropout_rate,
             with_final_sigmoid=False,
         )
         self.global_decoder = ImageDecoder(
@@ -84,11 +87,13 @@ class TempSAL(nn.Module):
             hidden_channels_list=hidden_channels_list,
             features_sizes=self.image_encoder.feature_sizes,
             output_channels=1,
+            dropout_rate=dropout_rate,
             with_final_sigmoid=False,
         )
         self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
             hidden_channels_list=hidden_channels_list,
             feature_channels_list=self.image_encoder.feature_channels_list,
+            dropout_rate=dropout_rate,
         )
 
         self.sigmoid = nn.Sigmoid()
