@@ -155,9 +155,22 @@ class LightningModel(pl.LightningModule):
         return temporal_output, global_output, sample_ids
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(
+        optimizer = torch.optim.AdamW(
             self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
             betas=(0.9, 0.95),
         )
+        learning_rate_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.5, patience=1, verbose=True
+        )
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': learning_rate_scheduler,
+                'monitor': 'val_loss',
+                'interval': 'epoch',
+                'frequency': 1,
+                'strict': True,
+            }
+        }

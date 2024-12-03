@@ -12,7 +12,7 @@ import multiprocessing
 import lightning.pytorch as pl
 
 from src.utils.random import set_seed
-from src.models.tempsal import TempSAL
+from src.models.livesal import LiveSAL
 from src.utils.parser import get_config
 from src.utils.file import get_paths_recursive
 from src.datasets.salicon_dataset import SaliconDataModule
@@ -83,7 +83,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/tempsal/global.yml",
+        default=f"{CONFIG_PATH}/livesal/global_salicon.yml",
         help="The path to the config file.",
     )
 
@@ -92,7 +92,7 @@ def parse_arguments() -> argparse.Namespace:
         "-checkpoint",
         "-cp",
         type=str,
-        default=f"{CHECKPOINTS_PATH}/tempsal_global.ckpt",
+        default=f"{CHECKPOINTS_PATH}/livesal_global.ckpt",
         help="The path to the checkpoint file.",
     )
 
@@ -115,11 +115,21 @@ def main() -> None:
     splits = tuple(map(float, config["splits"]))
     use_challenge_split = bool(config["use_challenge_split"])
     with_transforms = bool(config["with_transforms"])
+    image_n_levels = int(config["image_n_levels"])
+    hidden_channels = int(config["hidden_channels"])
+    neighbor_radius = int(config["neighbor_radius"])
+    n_iterations = int(config["n_iterations"])
+    with_graph_processing = bool(config["with_graph_processing"])
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
-    hidden_channels_list = list(map(int, config["hidden_channels_list"]))
+    depth_integration = str(config["depth_integration"])
     output_type = str(config["output_type"])
     dropout_rate = float(config["dropout_rate"])
+    with_graph_edge_features = bool(config["with_graph_edge_features"])
+    with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
+    with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
+    with_depth_information = bool(config["with_depth_information"])
+    with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
@@ -133,12 +143,21 @@ def main() -> None:
     )
 
     # Get model
-    model = TempSAL(
+    model = LiveSAL(
+        image_n_levels=image_n_levels,
         freeze_encoder=freeze_encoder,
         freeze_temporal_pipeline=freeze_temporal_pipeline,
-        hidden_channels_list=hidden_channels_list,
+        hidden_channels=hidden_channels,
+        neighbor_radius=neighbor_radius,
+        n_iterations=n_iterations,
+        depth_integration=depth_integration,
         output_type=output_type,
         dropout_rate=dropout_rate,
+        with_graph_processing=with_graph_processing,
+        with_graph_edge_features=with_graph_edge_features,
+        with_graph_positional_embeddings=with_graph_positional_embeddings,
+        with_graph_directional_kernels=with_graph_directional_kernels,
+        with_depth_information=with_depth_information,
     )
     if not os.path.exists(checkpoint_file_path):
         raise FileNotFoundError(
@@ -147,7 +166,7 @@ def main() -> None:
     lightning_model = LightningModel.load_from_checkpoint(
         checkpoint_path=checkpoint_file_path,
         model=model,
-        name="tempsal",
+        name="livesal",
         dataset="salicon",
     )
     print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}")
