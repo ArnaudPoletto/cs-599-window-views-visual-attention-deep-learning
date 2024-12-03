@@ -4,9 +4,8 @@ import torch.nn.functional as F
 
 
 class KLDivLoss(nn.Module):
-    def __init__(self, temperature: float = 1.0, eps: float = 1e-7):
+    def __init__(self, eps: float = 1e-8):
         super(KLDivLoss, self).__init__()
-        self.temperature = temperature
         self.eps = eps
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -26,10 +25,10 @@ class KLDivLoss(nn.Module):
             target = target.view(batch_size, height * width)
 
         # Prepare predictions and targets
-        pred = torch.log_softmax(pred / self.temperature, dim=1)
-        target = torch.softmax(target, dim=1)
+        pred = torch.log(pred / (torch.sum(pred, dim=1, keepdim=True) + self.eps))
+        target = target / (torch.sum(target, dim=1, keepdim=True) + self.eps)
 
         # Calculate KL divergence
         loss = nn.KLDivLoss(reduction="batchmean", log_target=False)(pred, target)
 
-        return loss * (self.temperature**2)
+        return loss

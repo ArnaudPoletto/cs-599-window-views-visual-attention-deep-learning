@@ -434,6 +434,9 @@ class LiveSAL(nn.Module):
         return global_output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.dim() == 3:
+            x = x.unsqueeze(0)
+
         if x.dim() not in [4, 5]:
             raise ValueError(
                 f"❌ Input tensor must be of shape (batch_size, channels, height, width) or (batch_size, sequence_length, channels, height, width), got {x.shape}."
