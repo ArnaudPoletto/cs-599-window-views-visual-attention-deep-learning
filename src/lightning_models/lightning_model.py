@@ -59,7 +59,7 @@ class LightningModel(pl.LightningModule):
         pass
 
     def _process_batch(self, batch) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        inputs, temporal_targets, global_targets = batch
+        inputs, temporal_targets, global_targets, _ = batch
         
         # Forward pass through model
         temporal_output, global_output = self.model(inputs)
@@ -70,12 +70,6 @@ class LightningModel(pl.LightningModule):
         if temporal_output is not None and temporal_targets is not None:
             temporal_loss = self.criterion(temporal_output, temporal_targets)
         if global_output is not None and global_targets is not None:
-            from matplotlib import pyplot as plt
-            plt.subplot(1, 2, 1)
-            plt.imshow(global_output[0].detach().cpu().numpy())
-            plt.subplot(1, 2, 2)
-            plt.imshow(global_targets[0].detach().cpu().numpy())
-            plt.show()
             global_loss = self.criterion(global_output, global_targets)
             
         return (
@@ -144,6 +138,21 @@ class LightningModel(pl.LightningModule):
         
         self.log('val_loss', val_loss, on_epoch=True, sync_dist=True)
         return {'val_loss': val_loss, **metrics}
+    
+    def test_step(self, batch, batch_idx):
+        ret = self.validation_step(batch, batch_idx)
+
+        # Replace val names with test names
+        for key in list(ret.keys()):
+            if key.startswith("val"):
+                ret[key.replace("val", "test")] = ret.pop(key)
+
+        return ret
+    
+    def predict_step(self, batch, batch_idx, dataloader_idx=None):
+        input, _, _, sample_ids = batch
+        temporal_output, global_output = self.model(input)
+        return temporal_output, global_output, sample_ids
 
     def configure_optimizers(self):
         return torch.optim.AdamW(
