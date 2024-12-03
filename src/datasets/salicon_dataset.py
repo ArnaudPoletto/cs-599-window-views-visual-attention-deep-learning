@@ -104,7 +104,10 @@ class SaliconDataset(Dataset):
         global_ground_truth_file_path = f"{sample_folder_path}/global_ground_truth.png"
 
         # ...otherwise return the frame only, typically for the challenge test set
+        print(ground_truth_file_paths, global_ground_truth_file_path)
         if len(ground_truth_file_paths) == 0 or not os.path.exists(global_ground_truth_file_path):
+            print(len(ground_truth_file_paths), os.path.exists(global_ground_truth_file_path))
+            print(f"🚨 No ground truths found for sample {sample_id}.")
             return frame, torch.zeros(1), torch.zeros(1), sample_id
 
         ground_truths = [

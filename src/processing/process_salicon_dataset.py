@@ -346,7 +346,7 @@ def process_sample(
     global_ground_truth_from_fixations = (global_saliency_map * 255).astype(np.uint8)
 
     # Write global ground truth to processed sample folder
-    dst_global_ground_truth_file_path = f"{output_folder_path}/global_ground_truth.jpg"
+    dst_global_ground_truth_file_path = f"{output_folder_path}/global_ground_truth.png"
     os.makedirs(os.path.dirname(dst_global_ground_truth_file_path), exist_ok=True)
     global_ground_truth_file_path = f"{RAW_SALICON_GROUND_TRUTHS_PATH}/{os.path.basename(frame_file_path).replace('.jpg', '.png')}"
     global_ground_truth = Image.open(global_ground_truth_file_path).convert("L")

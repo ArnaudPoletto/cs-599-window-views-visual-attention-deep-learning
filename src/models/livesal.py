@@ -7,6 +7,7 @@ from src.models.depth_encoder import DepthEncoder
 from src.models.image_encoder import ImageEncoder
 from src.models.depth_estimator import DepthEstimator
 from src.models.graph_processor import GraphProcessor
+from src.models.livesal_decoder import LiveSALDecoder
 from src.models.spatio_temporal_mixing_module import SpatioTemporalMixingModule
 from src.config import SEQUENCE_LENGTH, IMAGE_SIZE
 
@@ -153,62 +154,12 @@ class LiveSAL(nn.Module):
                 with_directional_kernels=with_graph_directional_kernels,
             )
 
-        self.temporal_layers = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Conv2d(
-                        in_channels=hidden_channels * 2,
-                        out_channels=hidden_channels,
-                        kernel_size=3,
-                        padding=1,
-                        bias=True,
-                    ),
-                    nn.GroupNorm(
-                        num_groups=LiveSAL._get_num_groups(hidden_channels, 32),
-                        num_channels=hidden_channels,
-                    ),
-                    nn.ReLU(inplace=True),
-                    nn.Dropout2d(dropout_rate),
-                    nn.Conv2d(
-                        in_channels=hidden_channels,
-                        out_channels=hidden_channels,
-                        kernel_size=3,
-                        padding=1,
-                        bias=True,
-                    ),
-                    nn.GroupNorm(
-                        num_groups=LiveSAL._get_num_groups(hidden_channels, 32),
-                        num_channels=hidden_channels,
-                    ),
-                    nn.ReLU(inplace=True),
-                    nn.Dropout2d(dropout_rate),
-                )
-                for _ in range(image_n_levels - 1)
-            ]
-        )
-        final_temporal_layer_in_channels = hidden_channels
-        if with_depth_information and depth_integration in ["late", "both"]:
-            final_temporal_layer_in_channels += hidden_channels
-        self.final_temporal_layer = nn.Sequential(
-            nn.Conv2d(
-                in_channels=final_temporal_layer_in_channels,
-                out_channels=hidden_channels // 2,
-                kernel_size=5,
-                padding=2,
-                bias=True,
-            ),
-            nn.GroupNorm(
-                num_groups=LiveSAL._get_num_groups(hidden_channels // 2, 16),
-                num_channels=hidden_channels // 2,
-            ),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(
-                in_channels=hidden_channels // 2,
-                out_channels=1,
-                kernel_size=5,
-                padding=2,
-                bias=True,
-            ),
+        self.temporal_decoder = LiveSALDecoder(
+            hidden_channels=hidden_channels,
+            n_levels=image_n_levels,
+            depth_integration=depth_integration,
+            with_depth_information=with_depth_information,
+            dropout_rate=dropout_rate,
         )
 
         self.final_global_layer = nn.Sequential(
@@ -403,38 +354,6 @@ class LiveSAL(nn.Module):
         )
 
         return depth_decoded_features
-
-    def _get_temporal_features(
-        self,
-        image_features_list: List[torch.Tensor],
-        depth_decoded_features: Optional[torch.Tensor],
-    ) -> torch.Tensor:
-        # Decode the features
-        # Start with the last 2 features and go backwards
-        x = image_features_list[-1]
-        for i, temporal_layer in enumerate(self.temporal_layers):
-            y = image_features_list[-(i + 2)]
-            x = nn.functional.interpolate(
-                x, size=y.shape[-2:], mode="bilinear", align_corners=False
-            )
-            x = torch.cat([x, y], dim=1)
-            x = temporal_layer(x)
-
-        # Get the final decoded features
-        decoded_features = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
-        )
-        if self.with_depth_information and self.depth_integration in ["late", "both"]:
-            decoded_features = torch.cat(
-                [decoded_features, depth_decoded_features], dim=1
-            )
-        decoded_features = self.final_temporal_layer(decoded_features).squeeze(1)
-
-        # Get temporal output from decoded features
-        batch_size_sequence_length, height, width = decoded_features.shape
-        temporal_features = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
-
-        return temporal_features
     
     def _forward_temporal_pipeline(
         self,
@@ -480,10 +399,7 @@ class LiveSAL(nn.Module):
             depth_decoded_features = None
 
         # Get temporal output
-        temporal_features = self._get_temporal_features(
-            image_features_list=image_features_list,
-            depth_decoded_features=depth_decoded_features,
-        )
+        temporal_features = self.temporal_decoder(image_features_list, depth_decoded_features)
         temporal_output = self.sigmoid(temporal_features)
         temporal_output = self._normalize_spatial_dimensions(temporal_output)
 
