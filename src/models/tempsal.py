@@ -8,7 +8,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 from src.models.image_encoder import ImageEncoder
 from src.models.image_decoder import ImageDecoder
 from src.models.spatio_temporal_mixing_module import SpatioTemporalMixingModule
-from src.config import SEQUENCE_LENGTH, CHECKPOINTS_PATH
+from src.config import SEQUENCE_LENGTH
 
 
 class TempSAL(nn.Module):

@@ -11,6 +11,7 @@ class LiveSALDecoder(nn.Module):
         n_levels: int,
         depth_integration: str,
         with_depth_information: bool,
+        use_pooled_features: bool,
         dropout_rate: float,
     ) -> None:
         super(LiveSALDecoder, self).__init__()
@@ -19,6 +20,7 @@ class LiveSALDecoder(nn.Module):
         self.n_levels = n_levels
         self.depth_integration = depth_integration
         self.with_depth_information = with_depth_information
+        self.use_pooled_features = use_pooled_features
         self.dropout_rate = dropout_rate
 
         self.layers = nn.ModuleList(
@@ -91,13 +93,13 @@ class LiveSALDecoder(nn.Module):
         # Decode the features
         # Start with the last 2 features and go backwards
         x = image_features_list[-1]
-        for i, temporal_layer in enumerate(self.layers):
+        for i, layer in enumerate(self.layers):
             y = image_features_list[-(i + 2)]
             x = nn.functional.interpolate(
                 x, size=y.shape[-2:], mode="bilinear", align_corners=False
             )
             x = torch.cat([x, y], dim=1)
-            x = temporal_layer(x)
+            x = layer(x)
 
         # Get the final decoded features
         decoded_features = nn.functional.interpolate(
@@ -107,10 +109,11 @@ class LiveSALDecoder(nn.Module):
             decoded_features = torch.cat(
                 [decoded_features, depth_decoded_features], dim=1
             )
-        decoded_features = self.final_layer(decoded_features).squeeze(1)
+        decoded_features = self.final_layer(decoded_features)
 
-        # Get temporal output from decoded features
-        batch_size_sequence_length, height, width = decoded_features.shape
-        temporal_features = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
+        if not self.use_pooled_features:
+            decoded_features = decoded_features.squeeze(1)
+            batch_size_sequence_length, height, width = decoded_features.shape
+            decoded_features = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
 
-        return temporal_features
+        return decoded_features

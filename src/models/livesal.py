@@ -159,43 +159,45 @@ class LiveSAL(nn.Module):
             n_levels=image_n_levels,
             depth_integration=depth_integration,
             with_depth_information=with_depth_information,
+            use_pooled_features=False,
             dropout_rate=dropout_rate,
         )
 
-        self.final_global_layer = nn.Sequential(
-            nn.Conv2d(
-                in_channels=SEQUENCE_LENGTH,
-                out_channels=SEQUENCE_LENGTH,
-                kernel_size=5,
-                padding=2,
-                bias=True,
-            ),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(
-                in_channels=SEQUENCE_LENGTH,
-                out_channels=1,
-                kernel_size=5,
-                padding=2,
-                bias=True,
-            ),
-            nn.Sigmoid(),
+        self.global_decoder = LiveSALDecoder(
+            hidden_channels=hidden_channels,
+            n_levels=image_n_levels,
+            depth_integration=depth_integration,
+            with_depth_information=with_depth_information,
+            use_pooled_features=True,
+            dropout_rate=dropout_rate,
+        )
+        self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
+            hidden_channels_list=[hidden_channels] * image_n_levels,
+            feature_channels_list=[hidden_channels] * image_n_levels,
         )
 
         self.sigmoid = nn.Sigmoid()
 
         if self.freeze_temporal_pipeline:
+            if with_depth_information and depth_integration in ["late", "both"]:
+                    for param in self.depth_encoder.parameters():
+                        param.requires_grad = False
+                    for param in self.depth_graph_processor.parameters():
+                        param.requires_grad = False
+                    for param in self.depth_decoder.parameters():
+                        param.requires_grad = False
             for param in self.image_projection_layers.parameters():
                 param.requires_grad = False
             if with_graph_processing:
                 for param in self.image_graph_processor.parameters():
                     param.requires_grad = False
-            for param in self.temporal_layers.parameters():
-                param.requires_grad = False
-            for param in self.final_temporal_layer.parameters():
+            for param in self.temporal_decoder.parameters():
                 param.requires_grad = False
 
         if self.output_type == "temporal":
-            for param in self.final_global_layer.parameters():
+            for param in self.global_decoder.parameters():
+                param.requires_grad = False
+            for param in self.spatio_temporal_mixing_module.parameters():
                 param.requires_grad = False
 
     def _get_num_groups(num_channels, max_groups):
@@ -403,10 +405,28 @@ class LiveSAL(nn.Module):
         temporal_output = self.sigmoid(temporal_features)
         temporal_output = self._normalize_spatial_dimensions(temporal_output)
 
-        return temporal_features, temporal_output
+        return image_features_list, depth_decoded_features, temporal_features, temporal_output
 
-    def _forward_global_pipeline(self, temporal_features: torch.Tensor):
-        global_output = self.final_global_layer(temporal_features)
+    def _forward_global_pipeline(self, image_features_list: List[torch.Tensor], depth_decoded_features: torch.Tensor, temporal_features: torch.Tensor):
+        # Reshape tensors
+        image_features_list = [image_features.view(-1, SEQUENCE_LENGTH, *image_features.shape[1:]) for image_features in image_features_list]
+        depth_decoded_features = depth_decoded_features.view(-1, SEQUENCE_LENGTH, *depth_decoded_features.shape[1:])
+        # Pool temporal features
+        pooled_image_features_list = [torch.mean(image_features, dim=1) for image_features in image_features_list]
+        pooled_depth_decoded_features = torch.mean(depth_decoded_features, dim=1)
+
+        # Get global features
+        global_features = self.global_decoder(pooled_image_features_list, pooled_depth_decoded_features)
+
+        # Get global output from spatio-temporal mixing module
+        print("image_features_list", [image_features.shape for image_features in image_features_list])
+        print("temporal_features", temporal_features.shape)
+        print("global_features", global_features.shape)
+        global_output = self.spatio_temporal_mixing_module(
+            encoded_features_list=pooled_image_features_list,
+            temporal_features=temporal_features,
+            global_features=global_features,
+        )
         global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
 
         return global_output
@@ -423,9 +443,9 @@ class LiveSAL(nn.Module):
         is_image = x.dim() == 4
 
         if self.output_type == "global":
-            temporal_features, _ = self._forward_temporal_pipeline(x, is_image)
-            global_output = self._forward_global_pipeline(temporal_features)
+            image_features_list, depth_decoded_features, temporal_features, _ = self._forward_temporal_pipeline(x, is_image)
+            global_output = self._forward_global_pipeline(image_features_list, depth_decoded_features, temporal_features)
             return None, global_output
         else:
-            _, temporal_output = self._forward_temporal_pipeline(x, is_image)
+            _, _, _, temporal_output = self._forward_temporal_pipeline(x, is_image)
             return temporal_output, None
