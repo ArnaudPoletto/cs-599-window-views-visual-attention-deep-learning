@@ -23,4 +23,4 @@ with_graph_edge_features: True
 with_graph_positional_embeddings: True
 with_graph_directional_kernels: True
 with_depth_information: True
-with_checkpoint: False
+with_checkpoint: True
