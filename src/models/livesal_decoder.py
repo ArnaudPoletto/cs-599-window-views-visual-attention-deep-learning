@@ -107,6 +107,8 @@ class LiveSALDecoder(nn.Module):
             x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
         )
         if self.with_depth_information and self.depth_integration in ["late", "both"]:
+            print("decoded_features.shape", decoded_features.shape)
+            print("depth_decoded_features.shape", depth_decoded_features.shape)
             decoded_features = torch.cat(
                 [decoded_features, depth_decoded_features], dim=1
             )
