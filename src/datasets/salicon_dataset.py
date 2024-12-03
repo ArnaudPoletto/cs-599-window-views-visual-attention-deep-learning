@@ -45,13 +45,6 @@ class SaliconDataset(Dataset):
         ground_truths: List[np.ndarray],
         global_ground_truth: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        # Resize frames and ground truths
-        frame = TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
-        ground_truths = [
-            TF.resize(gt, (IMAGE_SIZE, IMAGE_SIZE)) for gt in ground_truths
-        ]
-        global_ground_truth = TF.resize(global_ground_truth, (IMAGE_SIZE, IMAGE_SIZE))
-
         if self.with_transforms:
             do_flip = random.random() > 0.5
             do_rotate = random.random() > 0.5
@@ -95,10 +88,12 @@ class SaliconDataset(Dataset):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, np.ndarray, np.ndarray]:
         sample_folder_path = self.sample_folder_paths[index]
+        sample_id = int(Path(sample_folder_path).name)
 
         # Get frame
         frame_file_path = f"{sample_folder_path}/frame.jpg"
         frame = Image.open(frame_file_path).convert("RGB")
+        frame = TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
         frame = TF.to_tensor(frame).float()
 
         # Get ground truths if available...
@@ -110,13 +105,17 @@ class SaliconDataset(Dataset):
 
         # ...otherwise return the frame only, typically for the challenge test set
         if len(ground_truth_file_paths) == 0 or not os.path.exists(global_ground_truth_file_path):
-            return frame, None, None
+            return frame, torch.zeros(1), torch.zeros(1), sample_id
 
         ground_truths = [
                 Image.open(output_file_path).convert("L")
                 for output_file_path in ground_truth_file_paths
             ]
+        ground_truths = [
+            TF.resize(gt, (IMAGE_SIZE, IMAGE_SIZE)) for gt in ground_truths
+        ]
         global_ground_truth = Image.open(global_ground_truth_file_path).convert("L")
+        global_ground_truth = TF.resize(global_ground_truth, (IMAGE_SIZE, IMAGE_SIZE))
         frame, ground_truths, global_ground_truth = self._apply_transforms(frame, ground_truths, global_ground_truth)
 
         # Convert to torch tensors and normalize ground truths
@@ -126,7 +125,7 @@ class SaliconDataset(Dataset):
         global_ground_truth = TF.to_tensor(global_ground_truth).float().squeeze(0)
         global_ground_truth = global_ground_truth / global_ground_truth.max()
 
-        return frame, ground_truths, global_ground_truth
+        return frame, ground_truths, global_ground_truth, sample_id
 
 class SaliconDataModule(pl.LightningDataModule):
     def __init__(
@@ -220,7 +219,7 @@ class SaliconDataModule(pl.LightningDataModule):
                 with_transforms=False,
             )
             
-        if stage == "test" or stage is None:
+        if stage in ["test", "predict"] or stage is None:
             self.test_dataset = SaliconDataset(
                 sample_folder_paths=test_sample_folder_paths,
                 with_transforms=False,
@@ -261,3 +260,6 @@ class SaliconDataModule(pl.LightningDataModule):
             pin_memory=True,
             persistent_workers=True,
         )
+    
+    def predict_dataloader(self):
+        return self.test_dataset

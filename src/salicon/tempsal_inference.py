@@ -7,6 +7,7 @@ sys.path.append(str(GLOBAL_DIR))
 import os
 import argparse
 import platform
+from PIL import Image
 import multiprocessing
 import lightning.pytorch as pl
 
@@ -151,14 +152,19 @@ def main() -> None:
         logger=False,
     )
 
-    # predictions = trainer.predict(lightning_model, datamodule=data_module)
+    predictions = trainer.predict(lightning_model, datamodule=data_module)
 
-    # output_folder_path = f"{TEST_SALICON_PATH}/predictions"
-    # for i, pred in enumerate(predictions):
-    #     output_path = f"{output_folder_path}/prediction_{i}.png"
-    #     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    #     pred.save(output_path)
-    # print(f"✅ Saved predictions to {Path(output_folder_path).resolve()}")
+    output_folder_path = f"{TEST_SALICON_PATH}/predictions"
+    for pred in predictions:
+        _, global_output, sample_id = pred
+        output_path = f"{output_folder_path}/COCO_test2014_{sample_id:012d}.png"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        global_output = global_output.squeeze(0).cpu().numpy()
+        global_output = (global_output * 255).astype("uint8")
+        global_output = Image.fromarray(global_output)
+        global_output = global_output.resize((640, 480)) # TODO: remove hardocded values
+        global_output.save(output_path)
+    print(f"✅ Saved predictions to {Path(output_folder_path).resolve()}")
 
 if __name__ == "__main__":
     main()
