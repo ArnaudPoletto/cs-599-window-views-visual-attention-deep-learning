@@ -4,6 +4,7 @@ from pathlib import Path
 GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
+import time
 import torch
 import numpy as np
 from torch import nn
@@ -139,17 +140,61 @@ class LightningModel(pl.LightningModule):
         self.log('val_loss', val_loss, on_epoch=True, sync_dist=True)
         return {'val_loss': val_loss, **metrics}
     
+    def _process_batch_with_time(
+        self, 
+        batch,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, float]:
+        inputs, temporal_targets, global_targets, _ = batch
+        batch_size = inputs.shape[0]
+
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        start_time = time.perf_counter()
+
+        # Forward pass through model
+        temporal_output, global_output = self.model(inputs)
+
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        end_time = time.perf_counter()
+
+        batch_inference_time = end_time - start_time
+        instance_inference_time = batch_inference_time / batch_size
+
+        # Calculate losses using criterion
+        temporal_loss = None
+        global_loss = None
+        if temporal_output is not None and temporal_targets is not None:
+            temporal_loss = self.criterion(temporal_output, temporal_targets)
+        if global_output is not None and global_targets is not None:
+            global_loss = self.criterion(global_output, global_targets)
+            
+        return (
+            temporal_loss,
+            global_loss,
+            temporal_output,
+            global_output,
+            temporal_targets,
+            global_targets,
+            instance_inference_time,
+        )
+    
     def test_step(self, batch, batch_idx):
-        temporal_val_loss, global_val_loss, temporal_output, global_output, temporal_ground_truth, global_ground_truth = self._process_batch(batch)
+        temporal_test_loss, global_test_loss, temporal_output, global_output, temporal_ground_truth, global_ground_truth, instance_inference_time = self._process_batch_with_time(batch)
+        
+        # Initialize metrics dictionary
+        metrics = {}
+        self.log('instance_inference_time', instance_inference_time, on_epoch=True, sync_dist=True)
+        metrics['instance_inference_time'] = instance_inference_time
 
         # Calculate total validation loss
-        val_loss = 0
-        if temporal_val_loss is not None:
-            val_loss = val_loss + temporal_val_loss
-            self.log('test_temporal_loss', temporal_val_loss, on_epoch=True, sync_dist=True)
-        if global_val_loss is not None:
-            val_loss = val_loss + global_val_loss
-            self.log('test_global_loss', global_val_loss, on_epoch=True, sync_dist=True)
+        test_loss = 0
+        if temporal_test_loss is not None:
+            test_loss = test_loss + temporal_test_loss
+            self.log('test_temporal_loss', temporal_test_loss, on_epoch=True, sync_dist=True)
+        if global_test_loss is not None:
+            test_loss = test_loss + global_test_loss
+            self.log('test_global_loss', global_test_loss, on_epoch=True, sync_dist=True)
 
         # Get center bias dataset for metrics
         if self.dataset == "salicon":
@@ -160,7 +205,6 @@ class LightningModel(pl.LightningModule):
             center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(self.device)
 
         # Calculate metrics
-        metrics = {}
         if temporal_output is not None and temporal_ground_truth is not None:
             # Get global metrics for every temporal estimation
             temporal_metrics = Metrics().get_metrics(temporal_output, temporal_ground_truth, center_bias_prior=center_bias)
@@ -181,7 +225,10 @@ class LightningModel(pl.LightningModule):
             for key, value in global_metrics.items():
                 self.log(f'test_global_{key}', value, on_epoch=True, sync_dist=True)
                 metrics[f'global_{key}'] = value
-    
+
+        self.log('test_loss', test_loss, on_epoch=True, sync_dist=True)
+        return {'test_loss': test_loss, **metrics}
+       
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         input, _, _, sample_ids = batch
         temporal_output, global_output = self.model(input)
