@@ -105,7 +105,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/disjoint_simple_net/default.yml",
+        default=f"{CONFIG_PATH}/disjoint_simple_net/global.yml",
         help="The path to the config file.",
     )
 
@@ -149,6 +149,7 @@ def main() -> None:
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     output_type = str(config["output_type"])
+    dropout_rate = float(config["dropout_rate"])
     with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
@@ -168,6 +169,7 @@ def main() -> None:
         freeze_encoder=freeze_encoder,
         freeze_temporal_pipeline=freeze_temporal_pipeline,
         hidden_channels_list=hidden_channels_list,
+        dropout_rate=dropout_rate,
         output_type=output_type,
     )
     if with_checkpoint:

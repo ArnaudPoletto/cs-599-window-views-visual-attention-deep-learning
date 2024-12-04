@@ -13,6 +13,7 @@ class DisjointSimpleNet(nn.Module):
         freeze_temporal_pipeline: bool,
         hidden_channels_list: List[int],
         output_type: str,
+        dropout_rate: float,
         eps: float = 1e-6
     ) -> None:
         if output_type not in ["temporal", "global"]:
@@ -26,6 +27,7 @@ class DisjointSimpleNet(nn.Module):
         self.freeze_temporal_pipeline = freeze_temporal_pipeline
         self.hidden_channels_list = hidden_channels_list
         self.output_type = output_type
+        self.dropout_rate = dropout_rate
         self.eps = eps
 
         # Get normalization parameters for encoder inputs
@@ -50,6 +52,7 @@ class DisjointSimpleNet(nn.Module):
                 hidden_channels_list=hidden_channels_list,
                 features_sizes=self.image_encoders[i].feature_sizes,
                 output_channels=1,
+                dropout_rate=dropout_rate,
                 with_final_sigmoid=False,
             )
             for i in range(SEQUENCE_LENGTH)
