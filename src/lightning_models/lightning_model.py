@@ -40,8 +40,8 @@ class LightningModel(pl.LightningModule):
         self.dataset = dataset
 
         # Get criterion
-        kl_loss = KLDivLoss(temperature=1.0, eps=1e-7)
-        corr_loss = CorrelationCoefficientLoss(eps=1e-7)
+        kl_loss = KLDivLoss()
+        corr_loss = CorrelationCoefficientLoss()
         self.criterion = CombinedLoss(
             {
                 "kl": (kl_loss, LOSS_WEIGHTS["kl"]),

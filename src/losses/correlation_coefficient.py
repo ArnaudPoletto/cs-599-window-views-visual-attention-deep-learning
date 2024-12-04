@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class CorrelationCoefficientLoss(nn.Module):
-    def __init__(self, eps: float = 1e-7):
+    def __init__(self, eps: float = 1e-8):
         super(CorrelationCoefficientLoss, self).__init__()
         self.eps = eps
 
