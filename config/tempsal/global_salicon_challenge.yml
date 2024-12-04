@@ -1,16 +1,16 @@
 n_epochs: 10
-learning_rate: 1e-3
+learning_rate: 1e-4
 weight_decay: 1e-6
 batch_size: 8
 evaluation_steps: 32
 splits: [0.5, 0.25, 0.25]
-use_challenge_split: False
+use_challenge_split: True
 save_model: True
 with_transforms: True
 
 freeze_encoder: True
-freeze_temporal_pipeline: False
+freeze_temporal_pipeline: True
 hidden_channels_list: [96, 270, 256, 512]
-output_type: "temporal"
+output_type: "global"
 dropout_rate: 0.1
-with_checkpoint: False
+with_checkpoint: True

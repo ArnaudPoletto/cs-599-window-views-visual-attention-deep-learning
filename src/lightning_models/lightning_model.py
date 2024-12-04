@@ -140,14 +140,47 @@ class LightningModel(pl.LightningModule):
         return {'val_loss': val_loss, **metrics}
     
     def test_step(self, batch, batch_idx):
-        ret = self.validation_step(batch, batch_idx)
+        temporal_val_loss, global_val_loss, temporal_output, global_output, temporal_ground_truth, global_ground_truth = self._process_batch(batch)
 
-        # Replace val names with test names
-        for key in list(ret.keys()):
-            if key.startswith("val"):
-                ret[key.replace("val", "test")] = ret.pop(key)
+        # Calculate total validation loss
+        val_loss = 0
+        if temporal_val_loss is not None:
+            val_loss = val_loss + temporal_val_loss
+            self.log('test_temporal_loss', temporal_val_loss, on_epoch=True, sync_dist=True)
+        if global_val_loss is not None:
+            val_loss = val_loss + global_val_loss
+            self.log('test_global_loss', global_val_loss, on_epoch=True, sync_dist=True)
 
-        return ret
+        # Get center bias dataset for metrics
+        if self.dataset == "salicon":
+            center_bias_path = f"{SALICON_PATH}/center_bias.jpg"
+            center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(self.device)
+        elif self.dataset == "dhf1k":
+            center_bias_path = f"{DHF1K_PATH}/center_bias.jpg"
+            center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(self.device)
+
+        # Calculate metrics
+        metrics = {}
+        if temporal_output is not None and temporal_ground_truth is not None:
+            # Get global metrics for every temporal estimation
+            temporal_metrics = Metrics().get_metrics(temporal_output, temporal_ground_truth, center_bias_prior=center_bias)
+            for key, value in temporal_metrics.items():
+                self.log(f'test_temporal_{key}', value, on_epoch=True, sync_dist=True)
+                metrics[f'temporal_{key}'] = value
+            # Get separate metrics for each temporal 
+            for i in range(temporal_output.shape[1]):
+                temporal_output_i = temporal_output[:, i, :, :]
+                temporal_ground_truth_i = temporal_ground_truth[:, i, :, :]
+                temporal_metrics_i = Metrics().get_metrics(temporal_output_i, temporal_ground_truth_i, center_bias_prior=center_bias)
+                for key, value in temporal_metrics_i.items():
+                    self.log(f'test_temporal_{i}_{key}', value, on_epoch=True, sync_dist=True)
+                    metrics[f'temporal_{i}_{key}'] = value
+
+        if global_output is not None and global_ground_truth is not None:
+            global_metrics = Metrics().get_metrics(global_output, global_ground_truth, center_bias_prior=center_bias)
+            for key, value in global_metrics.items():
+                self.log(f'test_global_{key}', value, on_epoch=True, sync_dist=True)
+                metrics[f'global_{key}'] = value
     
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         input, _, _, sample_ids = batch
