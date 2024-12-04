@@ -51,11 +51,7 @@ def _get_data_module(
     Returns:
         Any: The data module.
     """
-    sample_folder_paths = get_paths_recursive(
-        folder_path=PROCESSED_SALICON_PATH, match_pattern="*", path_type="d"
-    )
     data_module = SaliconDataModule(
-        sample_folder_paths=sample_folder_paths,
         batch_size=batch_size,
         train_split=train_split,
         val_split=val_split,

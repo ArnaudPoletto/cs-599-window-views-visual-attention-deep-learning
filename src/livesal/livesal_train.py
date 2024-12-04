@@ -56,11 +56,7 @@ def _get_data_module(
         Any: The data module.
     """
     if dataset == "salicon":
-        sample_folder_paths = get_paths_recursive(
-            folder_path=PROCESSED_SALICON_PATH, match_pattern="*", path_type="d"
-        )
         data_module = SaliconDataModule(
-            sample_folder_paths=sample_folder_paths,
             batch_size=batch_size,
             train_split=train_split,
             val_split=val_split,
