@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 
 from src.models.image_encoder import ImageEncoder
 from src.models.image_decoder import ImageDecoder
-from src.config import SEQUENCE_LENGTH
+from src.config import SEQUENCE_LENGTH, FINAL_HEIGHT, FINAL_WIDTH
 
 class DisjointSimpleNet(nn.Module):
     def __init__(
@@ -123,7 +123,13 @@ class DisjointSimpleNet(nn.Module):
 
         # Compute the output
         if self.output_type == "global":
-            global_output = self.final_global_layer(temporal_features).squeeze(1)
+            global_output = self.final_global_layer(temporal_features)
+            global_output = nn.functional.interpolate(
+                global_output,
+                size=(FINAL_HEIGHT, FINAL_WIDTH),
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(1)
             return None, global_output
         else:
             temporal_output = self.sigmoid(temporal_features)
