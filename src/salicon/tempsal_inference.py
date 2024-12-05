@@ -79,7 +79,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/tempsal/global.yml",
+        default=f"{CONFIG_PATH}/tempsal/global_salicon_challenge.yml",
         help="The path to the config file.",
     )
 
@@ -88,7 +88,7 @@ def parse_arguments() -> argparse.Namespace:
         "-checkpoint",
         "-cp",
         type=str,
-        default=f"{CHECKPOINTS_PATH}/tempsal_global.ckpt",
+        default=f"{CHECKPOINTS_PATH}/tempsal_global_salicon_challenge.ckpt",
         help="The path to the checkpoint file.",
     )
 
