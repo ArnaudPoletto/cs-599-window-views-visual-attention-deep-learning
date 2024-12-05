@@ -28,39 +28,6 @@ from src.config import (
     FINAL_WIDTH,
 )
 
-def _get_data_module(
-    batch_size: int,
-    train_split: float,
-    val_split: float,
-    test_split: float,
-    use_challenge_split: bool,
-    with_transforms: bool,
-) -> SaliconDataModule:
-    """
-    Get the SALICON data module.
-
-    Args:
-        batch_size (int): The batch size.
-        train_split (float): The train split.
-        val_split (float): The validation split.
-        test_split (float): The test split.
-        with_transforms (bool): Whether to use transforms.
-
-    Returns:
-        Any: The data module.
-    """
-    data_module = SaliconDataModule(
-        batch_size=batch_size,
-        train_split=train_split,
-        val_split=val_split,
-        test_split=test_split,
-        use_challenge_split=use_challenge_split,
-        with_transforms=with_transforms,
-        n_workers=N_WORKERS,
-        seed=SEED,
-    )
-
-    return data_module
 
 def parse_arguments() -> argparse.Namespace:
     """
@@ -79,7 +46,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/livesal/disjoint_simple_net_salicon_challenge.yml",
+        default=f"{CONFIG_PATH}/disjoint_simple_net/global_salicon_challenge.yml",
         help="The path to the config file.",
     )
 
@@ -93,6 +60,7 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
 
 def main() -> None:
     if platform.system() != "Windows":
@@ -125,14 +93,15 @@ def main() -> None:
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
-    data_module = _get_data_module(
-        dataset=dataset,
+    data_module = SaliconDataModule(
         batch_size=batch_size,
         train_split=splits[0],
         val_split=splits[1],
         test_split=splits[2],
         use_challenge_split=use_challenge_split,
         with_transforms=with_transforms,
+        n_workers=N_WORKERS,
+        seed=SEED,
     )
 
     # Get model
@@ -151,7 +120,7 @@ def main() -> None:
     lightning_model = LightningModel.load_from_checkpoint(
         checkpoint_path=checkpoint_file_path,
         model=model,
-        name="livesal",
+        name="disjoint_simple_net",
         dataset="salicon",
     )
     print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}")
@@ -174,10 +143,10 @@ def main() -> None:
         global_output = global_output.squeeze(0).cpu().numpy()
         global_output = (global_output * 255).astype("uint8")
         global_output = Image.fromarray(global_output)
-        print("FINAL IMAGE", global_output.shape)
-        global_output = global_output.resize(
-            (FINAL_WIDTH, FINAL_HEIGHT)
-        )
-        print("FINAL FINAL IMAGE", global_output.shape)
+        global_output = global_output.resize((FINAL_WIDTH, FINAL_HEIGHT))
         global_output.save(output_path)
     print(f"✅ Saved predictions to {Path(output_folder_path).resolve()}")
+
+
+if __name__ == "__main__":
+    main()
