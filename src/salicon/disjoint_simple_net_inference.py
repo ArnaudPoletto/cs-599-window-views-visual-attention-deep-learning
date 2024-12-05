@@ -12,7 +12,7 @@ import multiprocessing
 import lightning.pytorch as pl
 
 from src.utils.random import set_seed
-from src.models.tempsal import TempSAL
+from src.models.disjoint_simple_net import DisjointSimpleNet
 from src.utils.parser import get_config
 from src.utils.file import get_paths_recursive
 from src.datasets.salicon_dataset import SaliconDataModule
@@ -28,6 +28,39 @@ from src.config import (
     FINAL_WIDTH,
 )
 
+def _get_data_module(
+    batch_size: int,
+    train_split: float,
+    val_split: float,
+    test_split: float,
+    use_challenge_split: bool,
+    with_transforms: bool,
+) -> SaliconDataModule:
+    """
+    Get the SALICON data module.
+
+    Args:
+        batch_size (int): The batch size.
+        train_split (float): The train split.
+        val_split (float): The validation split.
+        test_split (float): The test split.
+        with_transforms (bool): Whether to use transforms.
+
+    Returns:
+        Any: The data module.
+    """
+    data_module = SaliconDataModule(
+        batch_size=batch_size,
+        train_split=train_split,
+        val_split=val_split,
+        test_split=test_split,
+        use_challenge_split=use_challenge_split,
+        with_transforms=with_transforms,
+        n_workers=N_WORKERS,
+        seed=SEED,
+    )
+
+    return data_module
 
 def parse_arguments() -> argparse.Namespace:
     """
@@ -46,7 +79,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/tempsal/global_salicon_challenge.yml",
+        default=f"{CONFIG_PATH}/livesal/disjoint_simple_net_salicon_challenge.yml",
         help="The path to the config file.",
     )
 
@@ -55,12 +88,11 @@ def parse_arguments() -> argparse.Namespace:
         "-checkpoint",
         "-cp",
         type=str,
-        default=f"{CHECKPOINTS_PATH}/tempsal_global_salicon_challenge.ckpt",
+        default=f"{CHECKPOINTS_PATH}/disjoint_simple_net_global_salicon_challenge.ckpt",
         help="The path to the checkpoint file.",
     )
 
     return parser.parse_args()
-
 
 def main() -> None:
     if platform.system() != "Windows":
@@ -74,37 +106,44 @@ def main() -> None:
 
     # Get config parameters
     config = get_config(config_file_path)
+    dataset = str(config["dataset"])
+    n_epochs = int(config["n_epochs"])
+    learning_rate = float(config["learning_rate"])
+    weight_decay = float(config["weight_decay"])
     batch_size = int(config["batch_size"])
+    evaluation_steps = int(config["evaluation_steps"])
     splits = tuple(map(float, config["splits"]))
     use_challenge_split = bool(config["use_challenge_split"])
+    save_model = bool(config["save_model"])
     with_transforms = bool(config["with_transforms"])
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     output_type = str(config["output_type"])
     dropout_rate = float(config["dropout_rate"])
+    with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
-    data_module = SaliconDataModule(
+    data_module = _get_data_module(
+        dataset=dataset,
         batch_size=batch_size,
         train_split=splits[0],
         val_split=splits[1],
         test_split=splits[2],
         use_challenge_split=use_challenge_split,
         with_transforms=with_transforms,
-        n_workers=N_WORKERS,
-        seed=SEED,
     )
 
     # Get model
-    model = TempSAL(
+    model = DisjointSimpleNet(
         freeze_encoder=freeze_encoder,
         freeze_temporal_pipeline=freeze_temporal_pipeline,
         hidden_channels_list=hidden_channels_list,
-        output_type=output_type,
         dropout_rate=dropout_rate,
+        output_type=output_type,
     )
+
     if not os.path.exists(checkpoint_file_path):
         raise FileNotFoundError(
             f"❌ File {Path(checkpoint_file_path).resolve()} not found."
@@ -112,7 +151,7 @@ def main() -> None:
     lightning_model = LightningModel.load_from_checkpoint(
         checkpoint_path=checkpoint_file_path,
         model=model,
-        name="tempsal",
+        name="livesal",
         dataset="salicon",
     )
     print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}")
@@ -135,12 +174,10 @@ def main() -> None:
         global_output = global_output.squeeze(0).cpu().numpy()
         global_output = (global_output * 255).astype("uint8")
         global_output = Image.fromarray(global_output)
+        print("FINAL IMAGE", global_output.shape)
         global_output = global_output.resize(
             (FINAL_WIDTH, FINAL_HEIGHT)
         )
+        print("FINAL FINAL IMAGE", global_output.shape)
         global_output.save(output_path)
     print(f"✅ Saved predictions to {Path(output_folder_path).resolve()}")
-
-
-if __name__ == "__main__":
-    main()

@@ -24,42 +24,9 @@ from src.config import (
     CHECKPOINTS_PATH,
     TEST_SALICON_PATH,
     PROCESSED_SALICON_PATH,
+    FINAL_HEIGHT,
+    FINAL_WIDTH,
 )
-
-
-def _get_data_module(
-    batch_size: int,
-    train_split: float,
-    val_split: float,
-    test_split: float,
-    use_challenge_split: bool,
-    with_transforms: bool,
-) -> SaliconDataModule:
-    """
-    Get the SALICON data module.
-
-    Args:
-        batch_size (int): The batch size.
-        train_split (float): The train split.
-        val_split (float): The validation split.
-        test_split (float): The test split.
-        with_transforms (bool): Whether to use transforms.
-
-    Returns:
-        Any: The data module.
-    """
-    data_module = SaliconDataModule(
-        batch_size=batch_size,
-        train_split=train_split,
-        val_split=val_split,
-        test_split=test_split,
-        use_challenge_split=use_challenge_split,
-        with_transforms=with_transforms,
-        n_workers=N_WORKERS,
-        seed=SEED,
-    )
-
-    return data_module
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -79,7 +46,7 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/livesal/global_salicon.yml",
+        default=f"{CONFIG_PATH}/livesal/global_salicon_salicon_challenge.yml",
         help="The path to the config file.",
     )
 
@@ -88,7 +55,7 @@ def parse_arguments() -> argparse.Namespace:
         "-checkpoint",
         "-cp",
         type=str,
-        default=f"{CHECKPOINTS_PATH}/livesal_global.ckpt",
+        default=f"{CHECKPOINTS_PATH}/livesal_global_salicon_challenge.ckpt",
         help="The path to the checkpoint file.",
     )
 
@@ -129,13 +96,15 @@ def main() -> None:
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
-    data_module = _get_data_module(
+    data_module = SaliconDataModule(
         batch_size=batch_size,
         train_split=splits[0],
         val_split=splits[1],
         test_split=splits[2],
         use_challenge_split=use_challenge_split,
         with_transforms=with_transforms,
+        n_workers=N_WORKERS,
+        seed=SEED,
     )
 
     # Get model
@@ -186,8 +155,8 @@ def main() -> None:
         global_output = (global_output * 255).astype("uint8")
         global_output = Image.fromarray(global_output)
         global_output = global_output.resize(
-            (640, 480)
-        )  # TODO: remove hardocded values
+            (FINAL_WIDTH, FINAL_HEIGHT)
+        )
         global_output.save(output_path)
     print(f"✅ Saved predictions to {Path(output_folder_path).resolve()}")
 
