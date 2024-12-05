@@ -46,7 +46,6 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/livesal/global_salicon_salicon_challenge.yml",
         default=f"{CONFIG_PATH}/livesal/global_salicon_challenge.yml",
         help="The path to the config file.",
     )
