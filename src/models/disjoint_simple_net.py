@@ -100,6 +100,9 @@ class DisjointSimpleNet(nn.Module):
         return normalized_x
 
     def forward(self, x: torch.Tensor) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+        if x.dim() == 3:
+            x = x.unsqueeze(0)
+            
         # Normalize input and resize the tensor accordingly
         is_image = x.dim() == 4
         if not is_image:

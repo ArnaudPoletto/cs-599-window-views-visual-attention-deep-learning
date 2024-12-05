@@ -56,17 +56,18 @@ class SaliconDataset(Dataset):
         global_ground_truth: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
         if self.with_transforms:
-            do_flip = random.random() > 0.5
+            do_hflip = random.random() > 0.5
+            do_vflip = random.random() > 0.5
             do_rotate = random.random() > 0.5
-            angle = random.uniform(-15, 15) if do_rotate else 0
+            angle = random.uniform(-25, 25) if do_rotate else 0
             brightness_factor = random.uniform(0.9, 1.1)
             contrast_factor = random.uniform(0.9, 1.1)
             saturation_factor = random.uniform(0.9, 1.1)
             hue_factor = random.uniform(-0.05, 0.05)
             sigma = random.uniform(0.1, 0.5)
 
-            # Apply flip
-            if do_flip:
+            # Apply flips
+            if do_hflip:
                 frame = TF.hflip(frame)
                 transformed_ground_truths = []
                 for ground_truth in ground_truths:
@@ -74,16 +75,24 @@ class SaliconDataset(Dataset):
                     transformed_ground_truths.append(ground_truth)
                 ground_truths = transformed_ground_truths
                 global_ground_truth = TF.hflip(global_ground_truth)
+            if do_vflip:
+                frame = TF.vflip(frame)
+                transformed_ground_truths = []
+                for ground_truth in ground_truths:
+                    ground_truth = TF.vflip(ground_truth)
+                    transformed_ground_truths.append(ground_truth)
+                ground_truths = transformed_ground_truths
+                global_ground_truth = TF.vflip(global_ground_truth)
 
             # Apply rotation
             if do_rotate:
-                frame = TF.rotate(frame, angle, fill=0)
+                frame = frame.rotate(angle, expand=True, fillmode='reflect')
                 transformed_ground_truths = []
                 for ground_truth in ground_truths:
-                    ground_truth = TF.rotate(ground_truth, angle, fill=0)
+                    ground_truth = ground_truth.rotate(angle, expand=True, fill='reflect')
                     transformed_ground_truths.append(ground_truth)
                 ground_truths = transformed_ground_truths
-                global_ground_truth = TF.rotate(global_ground_truth, angle, fill=0)
+                global_ground_truth = global_ground_truth.rotate(angle, expand=True, fill='reflect')
 
             # Apply color transforms
             frame = TF.adjust_brightness(frame, brightness_factor)
@@ -104,7 +113,6 @@ class SaliconDataset(Dataset):
         frame_file_path = f"{sample_folder_path}/frame.jpg"
         frame = Image.open(frame_file_path).convert("RGB")
         frame = TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE))
-        frame = TF.to_tensor(frame).float()
 
         # Get ground truths if available...
         ground_truth_file_paths = get_paths_recursive(
@@ -117,6 +125,7 @@ class SaliconDataset(Dataset):
         if len(ground_truth_file_paths) == 0 or not os.path.exists(
             global_ground_truth_file_path
         ):
+            frame = TF.to_tensor(frame).float()
             return frame, torch.zeros(1), torch.zeros(1), sample_id
 
         ground_truths = [
@@ -135,6 +144,7 @@ class SaliconDataset(Dataset):
         )
 
         # Convert to torch tensors and normalize ground truths
+        frame = TF.to_tensor(frame).float()
         ground_truths = [
             TF.to_tensor(ground_truth).float() for ground_truth in ground_truths
         ]
