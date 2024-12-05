@@ -48,7 +48,7 @@ class SaliconDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.sample_folder_paths)
-
+    
     def _apply_transforms(
         self,
         frame: np.ndarray,
@@ -59,7 +59,9 @@ class SaliconDataset(Dataset):
             do_hflip = random.random() > 0.5
             do_vflip = random.random() > 0.5
             do_rotate = random.random() > 0.5
+            do_zoom = random.random() > 0.5
             angle = random.uniform(-25, 25) if do_rotate else 0
+            zoom_factor = random.uniform(1.0, 1.2)
             brightness_factor = random.uniform(0.9, 1.1)
             contrast_factor = random.uniform(0.9, 1.1)
             saturation_factor = random.uniform(0.9, 1.1)
@@ -86,13 +88,28 @@ class SaliconDataset(Dataset):
 
             # Apply rotation
             if do_rotate:
-                frame = frame.rotate(angle, expand=True, fillmode='reflect')
+                frame = TF.rotate(frame, angle, fill=0)
                 transformed_ground_truths = []
                 for ground_truth in ground_truths:
-                    ground_truth = ground_truth.rotate(angle, expand=True, fill='reflect')
+                    ground_truth = TF.rotate(ground_truth, angle, fill=0)
                     transformed_ground_truths.append(ground_truth)
                 ground_truths = transformed_ground_truths
-                global_ground_truth = global_ground_truth.rotate(angle, expand=True, fill='reflect')
+                global_ground_truth = TF.rotate(global_ground_truth, angle, fill=0)
+
+            # Apply zoom
+            if do_zoom:
+                w, h = frame.size
+                crop_w = int(w / zoom_factor)
+                crop_h = int(h / zoom_factor)
+                left = (w - crop_w) // 2
+                top = (h - crop_h) // 2
+                frame = TF.resized_crop(frame, top, left, crop_h, crop_w, (h, w))
+                ground_truths = [
+                    TF.resized_crop(gt, top, left, crop_h, crop_w, (h, w)) for gt in ground_truths
+                ]
+                global_ground_truth = TF.resized_crop(
+                    global_ground_truth, top, left, crop_h, crop_w, (h, w)
+                )
 
             # Apply color transforms
             frame = TF.adjust_brightness(frame, brightness_factor)
