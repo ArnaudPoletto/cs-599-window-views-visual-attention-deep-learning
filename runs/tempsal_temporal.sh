@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=tmsltmp
-#SBATCH --output=/scratch/izar/poletto/logs/log_tempsal_temporal_%j.out
-#SBATCH --error=/scratch/izar/poletto/logs/log_tempsal_temporal_%j.err
+#SBATCH --job-name=ttsc
+#SBATCH --output=/scratch/izar/poletto/logs/log_tempsal_temporal_salicon_challenge_%j.out
+#SBATCH --error=/scratch/izar/poletto/logs/log_tempsal_temporal_salicon_challenge_%j.err
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=2
 #SBATCH --gres=gpu:2
@@ -17,6 +17,6 @@ source /home/poletto/venvs/pdm/bin/activate
 
 cd /home/poletto/code
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-srun python src/tempsal/tempsal_train.py -c /home/poletto/code/config/tempsal/temporal.yml -n 4
+srun python src/tempsal/tempsal_train.py -c /home/poletto/code/config/tempsal/temporal_salicon_challenge.yml -n 4
 
 
