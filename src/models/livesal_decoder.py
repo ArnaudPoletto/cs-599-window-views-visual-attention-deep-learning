@@ -28,9 +28,6 @@ class LiveSALDecoder(nn.Module):
             ::-1
         ]
         out_channels_list = hidden_channels_list[::-1]
-        print("IN CHANNELS LIST: ", in_channels_list)
-        print("INC CHANNELS LIST: ", inc_channels_list)
-        print("OUT CHANNELS LIST: ", out_channels_list)
 
         self.decoder_layers = nn.ModuleList(
             [
