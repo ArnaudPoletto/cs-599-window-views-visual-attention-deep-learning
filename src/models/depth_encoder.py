@@ -29,7 +29,8 @@ class DepthEncoder(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-        self.features_size = self._get_features_size()
+        self.features_channels_list = [hidden_channels//4, hidden_channels//2, hidden_channels]
+        self.features_sizes = self._get_features_sizes()
 
     @staticmethod
     def _get_num_groups(num_channels, max_groups):
@@ -39,17 +40,18 @@ class DepthEncoder(nn.Module):
 
         return num_groups
 
-    def _get_features_size(self) -> int:
+    def _get_features_sizes(self) -> int:
         with torch.no_grad():
             x = torch.zeros(1, 1, IMAGE_SIZE, IMAGE_SIZE)
-            x = self.forward(x)[0]  # Get main output only
+            x = self.forward(x)
+            feature_sizes = [image_feature.size()[-1] for image_feature in x]
         
-        return x.shape[2]
+        return feature_sizes
     
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
         # Store intermediate features for skip connections
-        x1 = self.conv1(x)      # First skip feature
-        x2 = self.conv2(x1)     # Second skip feature
-        x3 = self.conv3(x2)     # Final output
+        x1 = self.conv1(x)
+        x2 = self.conv2(x1)
+        x3 = self.conv3(x2)
         
-        return x3, [x2, x1]  # Return final features and skip features
+        return x1, x2, x3

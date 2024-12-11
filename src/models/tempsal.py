@@ -77,7 +77,6 @@ class TempSAL(nn.Module):
         self.temporal_decoder = ImageDecoder(
             features_channels_list=self.image_encoder.feature_channels_list,
             hidden_channels_list=hidden_channels_list,
-            features_sizes=self.image_encoder.feature_sizes,
             output_channels=SEQUENCE_LENGTH,
             dropout_rate=dropout_rate,
             with_final_sigmoid=False,
@@ -85,7 +84,6 @@ class TempSAL(nn.Module):
         self.global_decoder = ImageDecoder(
             features_channels_list=self.image_encoder.feature_channels_list,
             hidden_channels_list=hidden_channels_list,
-            features_sizes=self.image_encoder.feature_sizes,
             output_channels=1,
             dropout_rate=dropout_rate,
             with_final_sigmoid=False,

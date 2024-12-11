@@ -50,7 +50,6 @@ class DisjointSimpleNet(nn.Module):
             ImageDecoder(
                 features_channels_list=self.image_encoders[i].feature_channels_list,
                 hidden_channels_list=hidden_channels_list,
-                features_sizes=self.image_encoders[i].feature_sizes,
                 output_channels=1,
                 dropout_rate=dropout_rate,
                 with_final_sigmoid=False,

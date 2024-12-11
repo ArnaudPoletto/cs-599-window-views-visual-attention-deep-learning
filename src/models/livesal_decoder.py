@@ -7,75 +7,66 @@ from src.config import IMAGE_SIZE, SEQUENCE_LENGTH
 class LiveSALDecoder(nn.Module):
     def __init__(
         self,
-        hidden_channels: int,
-        n_levels: int,
-        depth_integration: str,
+        features_channels_list: List[int],
+        hidden_channels_list: List[int],
+        output_channels: int,
+        dropout_rate: float,
         with_depth_information: bool,
         use_pooled_features: bool,
-        dropout_rate: float,
     ) -> None:
         super(LiveSALDecoder, self).__init__()
 
-        self.hidden_channels = hidden_channels
-        self.n_levels = n_levels
-        self.depth_integration = depth_integration
+        self.features_channels_list = features_channels_list
+        self.hidden_channels_list = hidden_channels_list
+        self.output_channels = output_channels
+        self.dropout_rate = dropout_rate
         self.with_depth_information = with_depth_information
         self.use_pooled_features = use_pooled_features
-        self.dropout_rate = dropout_rate
 
-        self.layers = nn.ModuleList(
+        in_channels_list = [features_channels_list[-1]] + hidden_channels_list[1:][::-1]
+        inc_channels_list = [features_channels_list[-2]] + features_channels_list[:-2][
+            ::-1
+        ]
+        out_channels_list = hidden_channels_list[::-1]
+        print("IN CHANNELS LIST: ", in_channels_list)
+        print("INC CHANNELS LIST: ", inc_channels_list)
+        print("OUT CHANNELS LIST: ", out_channels_list)
+
+        self.decoder_layers = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Conv2d(
-                        in_channels=hidden_channels * 2,
-                        out_channels=hidden_channels,
+                        in_channels=in_channels + inc_channels,
+                        out_channels=out_channels,
                         kernel_size=3,
                         padding=1,
-                        bias=True,
+                        bias=False,
                     ),
-                    nn.GroupNorm(
-                        num_groups=LiveSALDecoder._get_num_groups(hidden_channels, 32),
-                        num_channels=hidden_channels,
-                    ),
+                    nn.GroupNorm(num_groups=LiveSALDecoder._get_num_groups(out_channels, 32), num_channels=out_channels),
                     nn.ReLU(inplace=True),
-                    nn.Dropout2d(dropout_rate),
-                    nn.Conv2d(
-                        in_channels=hidden_channels,
-                        out_channels=hidden_channels,
-                        kernel_size=3,
-                        padding=1,
-                        bias=True,
-                    ),
-                    nn.GroupNorm(
-                        num_groups=LiveSALDecoder._get_num_groups(hidden_channels, 32),
-                        num_channels=hidden_channels,
-                    ),
-                    nn.ReLU(inplace=True),
-                    nn.Dropout2d(dropout_rate),
+                    nn.Dropout(p=dropout_rate),
                 )
-                for _ in range(n_levels - 1)
+                for in_channels, inc_channels, out_channels in zip(
+                    in_channels_list, inc_channels_list, out_channels_list
+                )
             ]
         )
 
-        final_layer_in_channels = hidden_channels
-        if with_depth_information and depth_integration in ["late", "both"]:
-            final_layer_in_channels += hidden_channels
+        # Get the final layer
+        final_channels = out_channels_list[-1]
         self.final_layer = nn.Sequential(
             nn.Conv2d(
-                in_channels=final_layer_in_channels,
-                out_channels=hidden_channels // 2,
+                in_channels=final_channels,
+                out_channels=final_channels,
                 kernel_size=5,
                 padding=2,
-                bias=True,
+                bias=False,
             ),
-            nn.GroupNorm(
-                num_groups=LiveSALDecoder._get_num_groups(hidden_channels // 2, 16),
-                num_channels=hidden_channels // 2,
-            ),
+            nn.GroupNorm(num_groups=LiveSALDecoder._get_num_groups(final_channels, 32), num_channels=final_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels=hidden_channels // 2,
-                out_channels=1,
+                in_channels=final_channels,
+                out_channels=output_channels,
                 kernel_size=5,
                 padding=2,
                 bias=True,
@@ -91,30 +82,32 @@ class LiveSALDecoder(nn.Module):
         return num_groups
 
     def forward(self, image_features_list: List[torch.Tensor], depth_decoded_features: Optional[torch.Tensor]) -> torch.Tensor:
-        # Decode the features
-        # Start with the last 2 features and go backwards
+        # Start with the deepest feature
         x = image_features_list[-1]
-        for i, layer in enumerate(self.layers):
+
+        # Decode features with skip connections
+        for i, decoder_layer in enumerate(self.decoder_layers):
+            # Get skip connection feature
             y = image_features_list[-(i + 2)]
+
+            # Upsample current feature to match skip connection size
             x = nn.functional.interpolate(
                 x, size=y.shape[-2:], mode="bilinear", align_corners=False
             )
-            x = torch.cat([x, y], dim=1)
-            x = layer(x)
 
-        # Get the final decoded features
-        decoded_features = nn.functional.interpolate(
+            # Concatenate and process
+            x = torch.cat([x, y], dim=1)
+            x = decoder_layer(x)
+
+        # Final upsampling to target size and processing
+        output = nn.functional.interpolate(
             x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
         )
-        if self.with_depth_information and self.depth_integration in ["late", "both"]:
-            decoded_features = torch.cat(
-                [decoded_features, depth_decoded_features], dim=1
-            )
-        decoded_features = self.final_layer(decoded_features)
+        output = self.final_layer(output)
 
         if not self.use_pooled_features:
-            decoded_features = decoded_features.squeeze(1)
-            batch_size_sequence_length, height, width = decoded_features.shape
-            decoded_features = decoded_features.view(-1, SEQUENCE_LENGTH, height, width)
+            output = output.squeeze(1)
+            batch_size_sequence_length, height, width = output.shape
+            output = output.view(-1, SEQUENCE_LENGTH, height, width)
 
-        return decoded_features
+        return output

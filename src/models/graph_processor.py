@@ -10,8 +10,8 @@ class GraphProcessor(nn.Module):
     """
     def __init__(
         self,
-        hidden_channels: int,
-        fusion_size: int,
+        channels: int,
+        size: int,
         neighbor_radius: int,
         n_iterations: int,
         dropout_rate: float,
@@ -23,8 +23,8 @@ class GraphProcessor(nn.Module):
         Initialize the graph processor module.
         
         Args:
-            hidden_channels (int): The number of hidden channels.
-            fusion_size (int): The size of the fusion.
+            channels (int): The number of channels.
+            size (int): The size of the fusion.
             neighbor_radius (int): The neighbor radius.
             n_iterations (int): The number of iterations.
             dropout_rate (float): The dropout rate.
@@ -34,15 +34,15 @@ class GraphProcessor(nn.Module):
         """
         super(GraphProcessor, self).__init__()
 
-        self.hidden_channels = hidden_channels
-        self.fusion_size = fusion_size
+        self.channels = channels
+        self.size = size
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
         self.dropout_rate = dropout_rate
         self.with_edge_features = with_edge_features
         self.with_positional_embeddings = with_positional_embeddings
         self.with_directional_kernels = with_directional_kernels
-        self.scale = hidden_channels**-0.5
+        self.scale = channels**-0.5
 
         self.spatial_dropout = nn.Dropout2d(dropout_rate)
         self.temporal_dropout = nn.Dropout3d(dropout_rate)
@@ -50,126 +50,126 @@ class GraphProcessor(nn.Module):
 
         # Get intra-attention components
         self.intra_key_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
+            in_channels=channels,
+            out_channels=channels,
             kernel_size=3,
             padding=1,
             bias=True,
         )
         self.intra_query_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
+            in_channels=channels,
+            out_channels=channels,
             kernel_size=3,
             padding=1,
             bias=True,
         )
         self.intra_value_conv = nn.Conv2d(
-            in_channels=hidden_channels,
-            out_channels=hidden_channels,
+            in_channels=channels,
+            out_channels=channels,
             kernel_size=3,
             padding=1,
             bias=True,
         )
         self.intra_output = nn.Sequential(
             nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
+            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(channels, 32), num_channels=channels),
             nn.ReLU(inplace=True),
         )
         self.intra_alpha = nn.Parameter(torch.tensor(0.5))
 
         if with_positional_embeddings:
             self.positional_embeddings = nn.Parameter(
-                torch.randn(2, 1, fusion_size, fusion_size)
+                torch.randn(2, 1, size, size)
             )
 
         # Get inter-attention components
-        inter_message_edge_in_channels = hidden_channels
+        inter_message_edge_in_channels = channels
         if with_positional_embeddings:
             inter_message_edge_in_channels += 1
         if with_edge_features:
             inter_message_edge_in_channels += 2 # TODO: adapt given edge features dimension
         self.inter_message_edge_conv = nn.Conv2d(
             in_channels=inter_message_edge_in_channels,
-            out_channels=hidden_channels,
+            out_channels=channels,
             kernel_size=3,
             padding=1,
             bias=True,
         )
         if with_directional_kernels:
             self.future_inter_query_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
             self.future_inter_key_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
             self.future_inter_value_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
             self.past_inter_query_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
             self.past_inter_key_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
             self.past_inter_value_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
         else:
             self.inter_query_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
             self.inter_key_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
             self.inter_value_conv = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=True,
             )
         self.inter_gate_conv = nn.Sequential(
             nn.Conv2d(
-                in_channels=hidden_channels * 2,
-                out_channels=hidden_channels,
+                in_channels=channels * 2,
+                out_channels=channels,
                 kernel_size=1,
                 padding=0,
                 bias=True,
@@ -179,21 +179,21 @@ class GraphProcessor(nn.Module):
         )
         self.inter_output = nn.Sequential(
             nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=hidden_channels,
+                in_channels=channels,
+                out_channels=channels,
                 kernel_size=3,
                 padding=1,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
+            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(channels, 32), num_channels=channels),
             nn.ReLU(inplace=True),
         )
 
         # Get the final components to combine intra- and inter-attention
         self.intra_inter_alpha = nn.Parameter(torch.tensor(0.5))
         self.gru = ConvGRU(
-            input_channels=hidden_channels,
-            hidden_channels=hidden_channels,
+            input_channels=channels,
+            hidden_channels=channels,
             kernel_size=3,
             padding=1,
         )

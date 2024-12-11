@@ -20,7 +20,6 @@ class ImageDecoder(nn.Module):
         self,
         features_channels_list: List[int],
         hidden_channels_list: List[int],
-        features_sizes: List[int],
         output_channels: int,
         dropout_rate: float,
         with_final_sigmoid: bool,
@@ -31,7 +30,6 @@ class ImageDecoder(nn.Module):
         Args:
             features_channels (List[int]): The number of channels of the features to decode.
             hidden_channels (List[int]): The number of hidden channels to use, i.e. the number of output channels of the decoder layers.
-            features_sizes (List[int]): The spatial size of the features to decode.
             output_channels (int): The number of output channels.
             with_final_sigmoid (bool): Whether to apply a sigmoid activation to the output.
         """
@@ -39,7 +37,6 @@ class ImageDecoder(nn.Module):
 
         self.features_channels_list = features_channels_list
         self.hidden_channels_list = hidden_channels_list
-        self.features_sizes = features_sizes
         self.output_channels = output_channels
         self.dropout_rate = dropout_rate
         self.with_final_sigmoid = with_final_sigmoid
@@ -110,18 +107,24 @@ class ImageDecoder(nn.Module):
         Returns:
             torch.Tensor: The decoded image.
         """
-        # Decode the features
-        # Start with the last 2 features and go backwards
+        # Start with the deepest feature
         x = xs[-1]
+
+        # Decode features with skip connections
         for i, decoder_layer in enumerate(self.decoder_layers):
+            # Get skip connection feature
             y = xs[-(i + 2)]
+
+            # Upsample current feature to match skip connection size
             x = nn.functional.interpolate(
                 x, size=y.shape[-2:], mode="bilinear", align_corners=False
             )
+
+            # Concatenate and process
             x = torch.cat([x, y], dim=1)
             x = decoder_layer(x)
 
-        # Get the final output
+        # Final upsampling to target size and processing
         output = nn.functional.interpolate(
             x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
         )
