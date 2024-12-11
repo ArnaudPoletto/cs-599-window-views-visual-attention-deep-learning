@@ -14,7 +14,6 @@ import lightning.pytorch as pl
 from src.utils.random import set_seed
 from src.models.tempsal import TempSAL
 from src.utils.parser import get_config
-from src.utils.file import get_paths_recursive
 from src.datasets.salicon_dataset import SaliconDataModule
 from src.lightning_models.lightning_model import LightningModel
 from src.config import (
@@ -23,7 +22,6 @@ from src.config import (
     CONFIG_PATH,
     CHECKPOINTS_PATH,
     TEST_SALICON_PATH,
-    PROCESSED_SALICON_PATH,
     FINAL_HEIGHT,
     FINAL_WIDTH,
 )
