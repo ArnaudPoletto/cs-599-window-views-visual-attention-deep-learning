@@ -4,6 +4,7 @@ generated/
 thesis/
 *.pth
 paths.py
+logs/
 
 
 # Byte-compiled / optimized / DLL files

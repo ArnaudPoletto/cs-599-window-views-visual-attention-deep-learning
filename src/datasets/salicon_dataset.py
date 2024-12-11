@@ -22,8 +22,6 @@ from src.config import (
     IMAGE_SIZE,
     RAW_SALICON_IMAGES_PATH,
     PROCESSED_SALICON_PATH,
-    FINAL_HEIGHT,
-    FINAL_WIDTH,
 )
 
 
@@ -57,10 +55,10 @@ class SaliconDataset(Dataset):
     ) -> Tuple[np.ndarray, np.ndarray]:
         if self.with_transforms:
             do_hflip = random.random() > 0.5
-            do_vflip = random.random() > 0.5
-            do_rotate = random.random() > 0.5
-            do_zoom = random.random() > 0.5
-            angle = random.uniform(-25, 25) if do_rotate else 0
+            do_vflip = random.random() > 1.0
+            do_rotate = random.random() > 1.0
+            do_zoom = random.random() > 1.0
+            angle = random.uniform(-15, 15) if do_rotate else 0
             zoom_factor = random.uniform(1.0, 1.2)
             brightness_factor = random.uniform(0.9, 1.1)
             contrast_factor = random.uniform(0.9, 1.1)
@@ -154,7 +152,7 @@ class SaliconDataset(Dataset):
         ]
         global_ground_truth = Image.open(global_ground_truth_file_path).convert("L")
         global_ground_truth = TF.resize(
-            global_ground_truth, (FINAL_HEIGHT, FINAL_WIDTH)
+            global_ground_truth, (IMAGE_SIZE, IMAGE_SIZE)
         )
         frame, ground_truths, global_ground_truth = self._apply_transforms(
             frame, ground_truths, global_ground_truth
