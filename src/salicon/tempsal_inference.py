@@ -76,8 +76,6 @@ def main() -> None:
     splits = tuple(map(float, config["splits"]))
     use_challenge_split = bool(config["use_challenge_split"])
     with_transforms = bool(config["with_transforms"])
-    freeze_encoder = bool(config["freeze_encoder"])
-    freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     output_type = str(config["output_type"])
     dropout_rate = float(config["dropout_rate"])
@@ -97,8 +95,8 @@ def main() -> None:
 
     # Get model
     model = TempSAL(
-        freeze_encoder=freeze_encoder,
-        freeze_temporal_pipeline=freeze_temporal_pipeline,
+        freeze_encoder=False,
+        freeze_temporal_pipeline=False,
         hidden_channels_list=hidden_channels_list,
         output_type=output_type,
         dropout_rate=dropout_rate,
@@ -112,6 +110,7 @@ def main() -> None:
         model=model,
         name="tempsal",
         dataset="salicon",
+        strict=False,
     )
     print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}")
 
