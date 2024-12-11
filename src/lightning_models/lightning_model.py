@@ -242,7 +242,7 @@ class LightningModel(pl.LightningModule):
             betas=(0.9, 0.95),
         )
         learning_rate_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=1, verbose=True
+            optimizer, mode='min', factor=0.5, patience=1
         )
         return {
             'optimizer': optimizer,

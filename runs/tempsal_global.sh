@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=tmslglb
+#SBATCH --job-name=tgsc
 #SBATCH --output=/scratch/izar/poletto/logs/log_tempsal_global_%j.out
 #SBATCH --error=/scratch/izar/poletto/logs/log_tempsal_global_%j.err
 #SBATCH --nodes=4
@@ -17,6 +17,6 @@ source /home/poletto/venvs/pdm/bin/activate
 
 cd /home/poletto/code
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-srun python src/tempsal/tempsal_train.py -c /home/poletto/code/config/tempsal/global.yml -n 4
+srun python src/tempsal/tempsal_train.py -c /home/poletto/code/config/tempsal/global_salicon_challenge.yml -n 4
 
 
