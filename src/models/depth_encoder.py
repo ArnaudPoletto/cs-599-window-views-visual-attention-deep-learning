@@ -13,32 +13,21 @@ class DepthEncoder(nn.Module):
         # Split into individual layers for skip connections
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, hidden_channels//4, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.GroupNorm(num_groups=DepthEncoder._get_num_groups(hidden_channels//4, 8), num_channels=hidden_channels//4),
             nn.ReLU(inplace=True)
         )
         
         self.conv2 = nn.Sequential(
             nn.Conv2d(hidden_channels//4, hidden_channels//2, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.GroupNorm(num_groups=DepthEncoder._get_num_groups(hidden_channels//2, 16), num_channels=hidden_channels//2),
             nn.ReLU(inplace=True)
         )
         
         self.conv3 = nn.Sequential(
             nn.Conv2d(hidden_channels//2, hidden_channels, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.GroupNorm(num_groups=DepthEncoder._get_num_groups(hidden_channels, 32), num_channels=hidden_channels),
             nn.ReLU(inplace=True)
         )
 
         self.features_channels_list = [hidden_channels//4, hidden_channels//2, hidden_channels]
         self.features_sizes = self._get_features_sizes()
-
-    @staticmethod
-    def _get_num_groups(num_channels, max_groups):
-        num_groups = min(max_groups, num_channels)
-        while num_channels % num_groups != 0 and num_groups > 1:
-            num_groups -= 1
-
-        return num_groups
 
     def _get_features_sizes(self) -> int:
         with torch.no_grad():

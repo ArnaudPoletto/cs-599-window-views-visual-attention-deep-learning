@@ -78,7 +78,6 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(channels, 32), num_channels=channels),
             nn.ReLU(inplace=True),
         )
         self.intra_alpha = nn.Parameter(torch.tensor(0.5))
@@ -185,7 +184,6 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=False,
             ),
-            nn.GroupNorm(num_groups=GraphProcessor._get_num_groups(channels, 32), num_channels=channels),
             nn.ReLU(inplace=True),
         )
 
@@ -197,14 +195,6 @@ class GraphProcessor(nn.Module):
             kernel_size=3,
             padding=1,
         )
-
-    @staticmethod
-    def _get_num_groups(num_channels, max_groups):
-        num_groups = min(max_groups, num_channels)
-        while num_channels % num_groups != 0 and num_groups > 1:
-            num_groups -= 1
-
-        return num_groups
 
     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
         """
