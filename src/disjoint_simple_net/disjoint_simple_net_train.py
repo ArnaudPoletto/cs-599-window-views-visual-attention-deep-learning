@@ -214,7 +214,7 @@ def main() -> None:
         accelerator="gpu",
         devices=-1,
         num_nodes=n_nodes,
-        precision=32,
+        precision=16,
         strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
         val_check_interval=evaluation_steps,
         logger=wandb_logger,
