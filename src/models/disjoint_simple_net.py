@@ -128,7 +128,7 @@ class DisjointSimpleNet(nn.Module):
             global_output = nn.functional.interpolate(
                 global_output,
                 size=(IMAGE_SIZE, IMAGE_SIZE),
-                mode="bilinear",
+                mode="bicubic",
                 align_corners=False,
             ).squeeze(1)
             global_output = self.final_global_layer(temporal_features)
