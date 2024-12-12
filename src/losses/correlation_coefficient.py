@@ -13,7 +13,7 @@ class CorrelationCoefficientLoss(nn.Module):
                 f"❌ Predictions and targets must have the same shape, got {pred.shape} and {target.shape}"
             )
 
-        # Reshape if 4D tensors
+        # Reshape tensors
         if pred.dim() == 4:
             batch_size, channels, height, width = pred.shape
             pred = pred.reshape(batch_size * channels, height * width)
