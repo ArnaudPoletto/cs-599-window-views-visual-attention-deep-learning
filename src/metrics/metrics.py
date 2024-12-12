@@ -75,22 +75,29 @@ class Metrics:
             if torch.unique(target_i).numel() == 1:
                 continue
 
-            # Sort predictions and corresponding targets
-            sorted_indices = torch.argsort(pred_i, descending=True)
-            sorted_target = target_i[sorted_indices]
+            # Normalize prediction to [0,1]
+            pred_i = (pred_i - pred_i.min()) / (pred_i.max() - pred_i.min() + self.eps)
 
-            # Threshold target
-            sorted_target_binary = (sorted_target > 0.5).float()
+            # Get fixation locations and thresholds
+            fixation_mask = target_i > 0.5
+            if not fixation_mask.any():
+                continue
+                
+            thresholds = torch.sort(pred_i[fixation_mask], descending=True)[0]
+            
+            # Vectorized computation of TPR and FPR
+            # Create a comparison matrix: (n_thresholds x n_pixels)
+            threshold_matrix = thresholds.unsqueeze(1)  # Shape: [n_thresholds, 1]
+            pred_matrix = pred_i.unsqueeze(0)          # Shape: [1, n_pixels]
+            above_threshold = pred_matrix >= threshold_matrix  # Shape: [n_thresholds, n_pixels]
 
-            # Compute true positive rates and false positive rates
-            tp = torch.cumsum(sorted_target_binary, dim=0)
-            fp = torch.cumsum(1 - sorted_target_binary, dim=0)
+            # Compute TPR and FPR vectors at once
+            tpr = torch.sum(above_threshold[:, fixation_mask], dim=1).float() / (torch.sum(fixation_mask) + self.eps)
+            fpr = torch.sum(above_threshold[:, ~fixation_mask], dim=1).float() / (torch.sum(~fixation_mask) + self.eps)
 
-            total_positives = torch.sum(sorted_target_binary)
-            total_negatives = torch.sum(1 - sorted_target_binary)
-
-            tpr = tp / (total_positives + self.eps)
-            fpr = fp / (total_negatives + self.eps)
+            # Add (1,1) point
+            tpr = torch.cat([tpr, torch.ones(1, device=pred.device)])
+            fpr = torch.cat([fpr, torch.ones(1, device=pred.device)])
 
             # Compute AUC using trapezoidal rule
             width = fpr[1:] - fpr[:-1]
@@ -102,7 +109,7 @@ class Metrics:
         if aucs:
             return torch.mean(torch.stack(aucs))
         else:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=pred.device)
 
     def nss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
