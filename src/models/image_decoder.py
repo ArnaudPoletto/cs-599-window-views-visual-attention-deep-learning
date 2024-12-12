@@ -116,7 +116,7 @@ class ImageDecoder(nn.Module):
 
         # Final upsampling to target size and processing
         output = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
         output = self.final_layer(output)
 

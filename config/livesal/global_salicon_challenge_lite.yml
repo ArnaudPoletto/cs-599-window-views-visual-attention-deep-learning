@@ -1,6 +1,6 @@
 dataset: "salicon" # "salicon" | "dhf1k" 
 n_epochs: 10
-learning_rate: 1e-3
+learning_rate: 1e-4
 weight_decay: 1e-4
 batch_size: 1
 evaluation_steps: 10
@@ -11,17 +11,17 @@ with_transforms: True
 
 image_n_levels: 5
 freeze_encoder: True
-freeze_temporal_pipeline: False
+freeze_temporal_pipeline: True
 hidden_channels: 64
 neighbor_radius: 1
 n_iterations: 3
 image_hidden_channels_list: [96, 270, 256, 512]
 depth_hidden_channels_list: [16, 32]
-output_type: "temporal"
-dropout_rate: 0.3
+output_type: "global"
+dropout_rate: 0.1
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True
 with_graph_directional_kernels: True
 with_depth_information: True
-with_checkpoint: False
+with_checkpoint: True

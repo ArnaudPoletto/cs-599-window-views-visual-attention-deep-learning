@@ -78,6 +78,7 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=False,
             ),
+            nn.BatchNorm2d(channels),
             nn.ReLU(inplace=True),
         )
         self.intra_alpha = nn.Parameter(torch.tensor(0.5))
@@ -184,8 +185,11 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=False,
             ),
+            nn.BatchNorm2d(channels),
             nn.ReLU(inplace=True),
         )
+
+        self.message_norm = nn.BatchNorm2d(channels)
 
         # Get the final components to combine intra- and inter-attention
         self.intra_inter_alpha = nn.Parameter(torch.tensor(0.5))
@@ -355,6 +359,7 @@ class GraphProcessor(nn.Module):
                     self.intra_inter_alpha * intra_output
                     + (1 - self.intra_inter_alpha) * inter_output
                 )
+                combined_message = self.message_norm(combined_message)
 
                 next_h = self.gru(combined_message, hi)
                 next_h = next_h + hi

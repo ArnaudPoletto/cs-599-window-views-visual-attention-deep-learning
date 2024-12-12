@@ -134,7 +134,7 @@ class SpatioTemporalMixingModule(nn.Module):
 
         # Get the final output
         output = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
         output = self.final_layer(output)
 

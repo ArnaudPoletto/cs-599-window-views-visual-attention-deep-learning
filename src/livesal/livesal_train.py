@@ -145,7 +145,8 @@ def main() -> None:
     hidden_channels = int(config["hidden_channels"])
     neighbor_radius = int(config["neighbor_radius"])
     n_iterations = int(config["n_iterations"])
-    hidden_channels_list = list(map(int, config["hidden_channels_list"]))
+    image_hidden_channels_list = list(map(int, config["image_hidden_channels_list"]))
+    depth_hidden_channels_list = list(map(int, config["depth_hidden_channels_list"]))
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
     output_type = str(config["output_type"])
@@ -177,7 +178,8 @@ def main() -> None:
         hidden_channels=hidden_channels,
         neighbor_radius=neighbor_radius,
         n_iterations=n_iterations,
-        hidden_channels_list=hidden_channels_list,
+        image_hidden_channels_list=image_hidden_channels_list,
+        depth_hidden_channels_list=depth_hidden_channels_list,
         output_type=output_type,
         dropout_rate=dropout_rate,
         with_graph_processing=with_graph_processing,

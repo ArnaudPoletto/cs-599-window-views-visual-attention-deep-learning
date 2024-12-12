@@ -9,6 +9,7 @@ class LiveSALDecoder(nn.Module):
         self,
         features_channels_list: List[int],
         hidden_channels_list: List[int],
+        depth_channels: int,
         output_channels: int,
         dropout_rate: float,
         with_depth_information: bool,
@@ -18,6 +19,7 @@ class LiveSALDecoder(nn.Module):
 
         self.features_channels_list = features_channels_list
         self.hidden_channels_list = hidden_channels_list
+        self.depth_channels = depth_channels
         self.output_channels = output_channels
         self.dropout_rate = dropout_rate
         self.with_depth_information = with_depth_information
@@ -49,18 +51,21 @@ class LiveSALDecoder(nn.Module):
         )
 
         # Get the final layer
-        final_channels = out_channels_list[-1]
+        in_final_channels = out_channels_list[-1]
+        if with_depth_information:
+            in_final_channels += depth_channels
+        out_final_channels = out_channels_list[-1]
         self.final_layer = nn.Sequential(
             nn.Conv2d(
-                in_channels=final_channels,
-                out_channels=final_channels,
+                in_channels=in_final_channels,
+                out_channels=out_final_channels,
                 kernel_size=5,
                 padding=2,
                 bias=False,
             ),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels=final_channels,
+                in_channels=out_final_channels,
                 out_channels=output_channels,
                 kernel_size=5,
                 padding=2,
@@ -88,8 +93,10 @@ class LiveSALDecoder(nn.Module):
 
         # Final upsampling to target size and processing
         output = nn.functional.interpolate(
-            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bicubic", align_corners=False
+            x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
+        if self.with_depth_information:
+            output = torch.cat([output, depth_decoded_features], dim=1)
         output = self.final_layer(output)
 
         if not self.use_pooled_features:
