@@ -51,6 +51,8 @@ class LiveSAL(nn.Module):
         self.hidden_channels = hidden_channels
         self.neighbor_radius = neighbor_radius
         self.n_iterations = n_iterations
+        projection_channels_list = [8, 16, 32, 64, 128] # TODO: change this
+        self.projection_channels_list = projection_channels_list
         self.image_hidden_channels_list = image_hidden_channels_list
         self.depth_hidden_channels_list = depth_hidden_channels_list
         self.dropout_rate = dropout_rate
@@ -115,17 +117,34 @@ class LiveSAL(nn.Module):
             n_levels=image_n_levels,
         )
 
-        if with_graph_processing:
-            image_last_layer_channels = self.image_encoder.feature_channels_list[-1]
-            self.image_graph_compressor = nn.Conv2d(
-                in_channels=image_last_layer_channels,
-                out_channels=hidden_channels,
-                kernel_size=1,
-                bias=True,
+        projection_in_channels_list = self.image_encoder.feature_channels_list
+        self.projection_layers = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(
+                    in_channels=in_channels,
+                    out_channels=(in_channels + out_channels) // 2,
+                    kernel_size=1,
+                    bias=True,
+                ),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d(p=dropout_rate),
+                nn.Conv2d(
+                    in_channels=(in_channels + out_channels) // 2,
+                    out_channels=out_channels,
+                    kernel_size=1,
+                    bias=True,
+                ),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d(p=dropout_rate),
             )
+            for in_channels, out_channels in zip(projection_in_channels_list, projection_channels_list)
+        ])
+
+        if with_graph_processing:
+            image_last_layer_channels = projection_channels_list[-1]
             image_last_layer_size = self.image_encoder.feature_sizes[-1]
             self.image_graph_processor = GraphProcessor(
-                channels=hidden_channels,
+                channels=image_last_layer_channels,
                 size=image_last_layer_size,
                 neighbor_radius=neighbor_radius,
                 n_iterations=n_iterations,
@@ -134,17 +153,14 @@ class LiveSAL(nn.Module):
                 with_positional_embeddings=with_graph_positional_embeddings,
                 with_directional_kernels=with_graph_directional_kernels,
             )
-            self.image_graph_expander = nn.Conv2d(
-                in_channels=hidden_channels,
-                out_channels=image_last_layer_channels,
-                kernel_size=1,
-                bias=True,
-            )
 
+        depth_channels = None
+        if with_depth_information:
+            depth_channels = self.depth_encoder.features_channels_list[-1]
         self.temporal_decoder = LiveSALDecoder(
-            features_channels_list=self.image_encoder.feature_channels_list,
+            features_channels_list=projection_channels_list,
             hidden_channels_list=image_hidden_channels_list,
-            depth_channels=self.depth_encoder.features_channels_list[-1],
+            depth_channels=depth_channels,
             output_channels=1,
             dropout_rate=dropout_rate,
             with_depth_information=with_depth_information,
@@ -152,9 +168,9 @@ class LiveSAL(nn.Module):
         )
 
         self.global_decoder = LiveSALDecoder(
-            features_channels_list=self.image_encoder.feature_channels_list,
+            features_channels_list=projection_channels_list,
             hidden_channels_list=image_hidden_channels_list,
-            depth_channels=self.depth_encoder.features_channels_list[-1],
+            depth_channels=depth_channels,
             output_channels=1,
             dropout_rate=dropout_rate,
             with_depth_information=with_depth_information,
@@ -163,7 +179,7 @@ class LiveSAL(nn.Module):
 
         self.spatio_temporal_mixing_module = SpatioTemporalMixingModule(
             hidden_channels_list=image_hidden_channels_list,
-            feature_channels_list=self.image_encoder.feature_channels_list,
+            feature_channels_list=projection_channels_list,
             dropout_rate=dropout_rate,
         )
 
@@ -178,11 +194,7 @@ class LiveSAL(nn.Module):
                     for param in self.depth_decoder.parameters():
                         param.requires_grad = False
             if with_graph_processing:
-                for param in self.image_graph_compressor.parameters():
-                    param.requires_grad = False
                 for param in self.image_graph_processor.parameters():
-                    param.requires_grad = False
-                for param in self.image_graph_expander.parameters():
                     param.requires_grad = False
             for param in self.temporal_decoder.parameters():
                 param.requires_grad = False
@@ -225,6 +237,10 @@ class LiveSAL(nn.Module):
         x_image = self._normalize_input(x, self.image_mean, self.image_std)
         image_features_list = self.image_encoder(x_image)
 
+        # Project features
+        for i, projection_layer in enumerate(self.projection_layers):
+            image_features_list[i] = projection_layer(image_features_list[i])
+
         # Expand features for image inputs to match the sequence length
         if is_image:
             new_image_features_list = []
@@ -238,7 +254,7 @@ class LiveSAL(nn.Module):
             image_features_list = new_image_features_list
 
         return image_features_list
-
+    
     def _get_graph_features(
         self, features: torch.Tensor, graph_processor: GraphProcessor
     ) -> torch.Tensor:
@@ -308,15 +324,14 @@ class LiveSAL(nn.Module):
     ):
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
+        print(">>", [image_features.shape for image_features in image_features_list])
 
         # Process features if needed
         if self.with_graph_processing:
-            image_features_list[-1] = self.image_graph_compressor(image_features_list[-1])
             image_features_list[-1] = self._get_graph_features(
                 features=image_features_list[-1],
                 graph_processor=self.image_graph_processor,
             )
-            image_features_list[-1] = self.image_graph_expander(image_features_list[-1])
 
         if self.with_depth_information:
             depth_encoded_features_list = self._get_depth_features_list(x, is_image)

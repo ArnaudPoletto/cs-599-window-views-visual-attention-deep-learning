@@ -9,12 +9,17 @@ class LiveSALDecoder(nn.Module):
         self,
         features_channels_list: List[int],
         hidden_channels_list: List[int],
-        depth_channels: int,
+        depth_channels: Optional[int],
         output_channels: int,
         dropout_rate: float,
         with_depth_information: bool,
         use_pooled_features: bool,
     ) -> None:
+        if depth_channels is None and with_depth_information:
+            raise ValueError(
+                "❌ You must provide the number of depth channels if you want to use depth information."
+            )
+        
         super(LiveSALDecoder, self).__init__()
 
         self.features_channels_list = features_channels_list

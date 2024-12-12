@@ -15,7 +15,7 @@ freeze_temporal_pipeline: False
 hidden_channels: 64
 neighbor_radius: 1
 n_iterations: 3
-image_hidden_channels_list: [96, 270, 256, 512]
+image_hidden_channels_list: [16, 32, 64, 128]
 depth_hidden_channels_list: [16, 32]
 output_type: "temporal"
 dropout_rate: 0.0
@@ -23,5 +23,5 @@ with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True
 with_graph_directional_kernels: True
-with_depth_information: True
+with_depth_information: False
 with_checkpoint: False
