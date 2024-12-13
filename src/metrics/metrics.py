@@ -63,7 +63,7 @@ class Metrics:
 
         return correlation_coefficient.mean()
 
-    def auc(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def auc(self, pred: torch.Tensor, target: torch.Tensor, chunk_size: int = 1000) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
         aucs = []
@@ -75,25 +75,42 @@ class Metrics:
             if torch.unique(target_i).numel() == 1:
                 continue
 
-            # Normalize prediction to [0,1]
-            pred_i = (pred_i - pred_i.min()) / (pred_i.max() - pred_i.min() + self.eps)
-
-            # Get fixation locations and thresholds
+            # Get fixation locations
             fixation_mask = target_i > 0.5
             if not fixation_mask.any():
                 continue
                 
             thresholds = torch.sort(pred_i[fixation_mask], descending=True)[0]
             
-            # Vectorized computation of TPR and FPR
-            # Create a comparison matrix: (n_thresholds x n_pixels)
-            threshold_matrix = thresholds.unsqueeze(1)  # Shape: [n_thresholds, 1]
-            pred_matrix = pred_i.unsqueeze(0)          # Shape: [1, n_pixels]
-            above_threshold = pred_matrix >= threshold_matrix  # Shape: [n_thresholds, n_pixels]
+            # Process thresholds in chunks to reduce memory usage
+            n_thresholds = len(thresholds)
+            tpr_list = []
+            fpr_list = []
+            
+            for start_idx in range(0, n_thresholds, chunk_size):
+                end_idx = min(start_idx + chunk_size, n_thresholds)
+                threshold_chunk = thresholds[start_idx:end_idx]
+                
+                # Process one threshold at a time within the chunk
+                chunk_tpr = []
+                chunk_fpr = []
+                for threshold in threshold_chunk:
+                    above_threshold = pred_i >= threshold
+                    tp = torch.sum(above_threshold[fixation_mask]).float()
+                    fp = torch.sum(above_threshold[~fixation_mask]).float()
+                    
+                    tpr = tp / (torch.sum(fixation_mask) + self.eps)
+                    fpr = fp / (torch.sum(~fixation_mask) + self.eps)
+                    
+                    chunk_tpr.append(tpr)
+                    chunk_fpr.append(fpr)
+                
+                tpr_list.extend(chunk_tpr)
+                fpr_list.extend(chunk_fpr)
 
-            # Compute TPR and FPR vectors at once
-            tpr = torch.sum(above_threshold[:, fixation_mask], dim=1).float() / (torch.sum(fixation_mask) + self.eps)
-            fpr = torch.sum(above_threshold[:, ~fixation_mask], dim=1).float() / (torch.sum(~fixation_mask) + self.eps)
+            # Convert lists to tensors
+            tpr = torch.tensor(tpr_list, device=pred.device)
+            fpr = torch.tensor(fpr_list, device=pred.device)
 
             # Add (1,1) point
             tpr = torch.cat([tpr, torch.ones(1, device=pred.device)])
