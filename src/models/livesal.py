@@ -126,6 +126,7 @@ class LiveSAL(nn.Module):
                     kernel_size=1,
                     bias=True,
                 ),
+                nn.GroupNorm(LiveSAL.get_n_groups((in_channels + out_channels) // 2), (in_channels + out_channels) // 2),
                 nn.ReLU(inplace=True),
                 nn.Dropout2d(p=dropout_rate),
                 nn.Conv2d(
@@ -134,6 +135,7 @@ class LiveSAL(nn.Module):
                     kernel_size=1,
                     bias=True,
                 ),
+                nn.GroupNorm(LiveSAL.get_n_groups(out_channels), out_channels),
                 nn.ReLU(inplace=True),
                 nn.Dropout2d(p=dropout_rate),
             )
@@ -204,6 +206,17 @@ class LiveSAL(nn.Module):
                 param.requires_grad = False
             for param in self.spatio_temporal_mixing_module.parameters():
                 param.requires_grad = False
+
+    @staticmethod
+    def get_n_groups(n_channels: int, min_factor: float = 4) -> int:
+        max_groups = max(1, n_channels // min_factor)
+        
+        # Try to find the largest divisor of num_channels that is smaller than num_channels
+        for groups in range(max_groups, 0, -1):
+            if n_channels % groups == 0:
+                return groups
+        
+        return n_channels
 
     def _normalize_input(
         self,

@@ -12,7 +12,7 @@ with_transforms: True
 image_n_levels: 5
 freeze_encoder: True
 freeze_temporal_pipeline: True
-hidden_channels: 64
+hidden_channels: 32 # TODO: change this variable
 neighbor_radius: 1
 n_iterations: 5
 image_hidden_channels_list: [16, 32, 64, 128]

@@ -78,6 +78,7 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=False,
             ),
+            nn.GroupNorm(GraphProcessor.get_n_groups(channels), channels),
             nn.BatchNorm2d(channels),
             nn.ReLU(inplace=True),
         )
@@ -185,11 +186,11 @@ class GraphProcessor(nn.Module):
                 padding=1,
                 bias=False,
             ),
-            nn.BatchNorm2d(channels),
+            nn.GroupNorm(GraphProcessor.get_n_groups(channels), channels),
             nn.ReLU(inplace=True),
         )
 
-        self.message_norm = nn.BatchNorm2d(channels)
+        self.message_norm = nn.GroupNorm(GraphProcessor.get_n_groups(channels), channels)
 
         # Get the final components to combine intra- and inter-attention
         self.intra_inter_alpha = nn.Parameter(torch.tensor(0.5))
@@ -199,6 +200,17 @@ class GraphProcessor(nn.Module):
             kernel_size=3,
             padding=1,
         )
+
+    @staticmethod
+    def get_n_groups(n_channels: int, min_factor: float = 4) -> int:
+        max_groups = max(1, n_channels // min_factor)
+        
+        # Try to find the largest divisor of num_channels that is smaller than num_channels
+        for groups in range(max_groups, 0, -1):
+            if n_channels % groups == 0:
+                return groups
+        
+        return n_channels
 
     def _compute_intra_attention(self, x: torch.Tensor) -> torch.Tensor:
         """

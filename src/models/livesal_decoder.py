@@ -46,6 +46,7 @@ class LiveSALDecoder(nn.Module):
                         padding=1,
                         bias=False,
                     ),
+                    nn.GroupNorm(LiveSALDecoder.get_n_groups(out_channels), out_channels),
                     nn.ReLU(inplace=True),
                     nn.Dropout(p=dropout_rate),
                 )
@@ -77,6 +78,17 @@ class LiveSALDecoder(nn.Module):
                 bias=True,
             ),
         )
+
+    @staticmethod
+    def get_n_groups(n_channels: int, min_factor: float = 4) -> int:
+        max_groups = max(1, n_channels // min_factor)
+        
+        # Try to find the largest divisor of num_channels that is smaller than num_channels
+        for groups in range(max_groups, 0, -1):
+            if n_channels % groups == 0:
+                return groups
+        
+        return n_channels
 
     def forward(self, image_features_list: List[torch.Tensor], depth_decoded_features: Optional[torch.Tensor]) -> torch.Tensor:
         # Start with the deepest feature
