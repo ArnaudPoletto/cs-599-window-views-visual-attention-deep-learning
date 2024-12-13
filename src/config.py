@@ -42,7 +42,7 @@ IMAGE_ENCODER_MODEL_NAME = "pnasnet5large"
 IMAGE_ENCODER_PRETRAINED = True
 
 LOSS_WEIGHTS = {
-    "kl": 10.0,
+    "kl": 1.0,
     "cc": 0.1,
 }
 
