@@ -99,8 +99,6 @@ class LightningModel(pl.LightningModule):
         if global_train_loss is not None:
             self.log('global_train_loss', global_train_loss, on_step=True, on_epoch=True, sync_dist=True)
 
-        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
-            
         return train_loss
     
     def validation_step(self, batch, batch_idx):
