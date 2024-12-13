@@ -3,7 +3,7 @@ n_epochs: 10
 learning_rate: 1e-3
 weight_decay: 1e-6
 batch_size: 2
-evaluation_steps: 128
+evaluation_steps: 1024
 splits: [0.7, 0.15, 0.15]
 use_challenge_split: True
 save_model: True
