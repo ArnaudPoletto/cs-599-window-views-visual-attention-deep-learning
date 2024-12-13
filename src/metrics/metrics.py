@@ -63,71 +63,6 @@ class Metrics:
 
         return correlation_coefficient.mean()
 
-    def auc(self, pred: torch.Tensor, target: torch.Tensor, chunk_size: int = 1000) -> torch.Tensor:
-        pred, target = self._reshape_4d(pred, target)
-
-        aucs = []
-        batch_size = pred.shape[0]
-        for i in range(batch_size):
-            pred_i = pred[i].flatten()
-            target_i = target[i].flatten()
-
-            if torch.unique(target_i).numel() == 1:
-                continue
-
-            # Get fixation locations
-            fixation_mask = target_i > 0.5
-            if not fixation_mask.any():
-                continue
-                
-            thresholds = torch.sort(pred_i[fixation_mask], descending=True)[0]
-            
-            # Process thresholds in chunks to reduce memory usage
-            n_thresholds = len(thresholds)
-            tpr_list = []
-            fpr_list = []
-            
-            for start_idx in range(0, n_thresholds, chunk_size):
-                end_idx = min(start_idx + chunk_size, n_thresholds)
-                threshold_chunk = thresholds[start_idx:end_idx]
-                
-                # Process one threshold at a time within the chunk
-                chunk_tpr = []
-                chunk_fpr = []
-                for threshold in threshold_chunk:
-                    above_threshold = pred_i >= threshold
-                    tp = torch.sum(above_threshold[fixation_mask]).float()
-                    fp = torch.sum(above_threshold[~fixation_mask]).float()
-                    
-                    tpr = tp / (torch.sum(fixation_mask) + self.eps)
-                    fpr = fp / (torch.sum(~fixation_mask) + self.eps)
-                    
-                    chunk_tpr.append(tpr)
-                    chunk_fpr.append(fpr)
-                
-                tpr_list.extend(chunk_tpr)
-                fpr_list.extend(chunk_fpr)
-
-            # Convert lists to tensors
-            tpr = torch.tensor(tpr_list, device=pred.device)
-            fpr = torch.tensor(fpr_list, device=pred.device)
-
-            # Add (1,1) point
-            tpr = torch.cat([tpr, torch.ones(1, device=pred.device)])
-            fpr = torch.cat([fpr, torch.ones(1, device=pred.device)])
-
-            # Compute AUC using trapezoidal rule
-            width = fpr[1:] - fpr[:-1]
-            height = (tpr[1:] + tpr[:-1]) / 2
-            auc = torch.sum(width * height)
-
-            aucs.append(auc)
-
-        if aucs:
-            return torch.mean(torch.stack(aucs))
-        else:
-            return torch.tensor(0.0, device=pred.device)
-
     def nss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         pred, target = self._reshape_4d(pred, target)
 
@@ -193,7 +128,6 @@ class Metrics:
         metrics = {
             "kldiv": self.kldiv(pred, target),
             "cc": self.cc(pred, target),
-            "auc": self.auc(pred, target),
             "nss": self.nss(pred, target),
             "sim": self.sim(pred, target),
         }
