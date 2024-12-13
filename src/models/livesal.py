@@ -324,7 +324,6 @@ class LiveSAL(nn.Module):
     ):
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
-        print(">>", [image_features.shape for image_features in image_features_list])
 
         # Process features if needed
         if self.with_graph_processing:

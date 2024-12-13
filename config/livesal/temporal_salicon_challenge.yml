@@ -3,7 +3,7 @@ n_epochs: 10
 learning_rate: 1e-4
 weight_decay: 1e-4
 batch_size: 8
-evaluation_steps: 32
+evaluation_steps: 256
 splits: [0.7, 0.15, 0.15]
 use_challenge_split: True
 save_model: True
@@ -18,7 +18,7 @@ n_iterations: 5
 image_hidden_channels_list: [16, 32, 64, 128]
 depth_hidden_channels_list: [16, 32]
 output_type: "temporal"
-dropout_rate: 0.3
+dropout_rate: 0.0
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True
