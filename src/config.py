@@ -43,7 +43,7 @@ IMAGE_ENCODER_PRETRAINED = True
 
 LOSS_WEIGHTS = {
     "kl": 1.0,
-    "cc": 0.1,
+    "cc": 1.0,
 }
 
 IMAGE_SIZE = 331
