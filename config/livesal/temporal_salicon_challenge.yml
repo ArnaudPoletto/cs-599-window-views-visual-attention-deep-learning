@@ -18,7 +18,7 @@ n_iterations: 3
 image_hidden_channels_list: [16, 32, 64, 128]
 depth_hidden_channels_list: [16, 32]
 output_type: "temporal"
-dropout_rate: 0.0
+dropout_rate: 0.3
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True
