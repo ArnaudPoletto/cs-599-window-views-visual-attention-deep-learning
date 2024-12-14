@@ -1,0 +1,28 @@
+# GC
+dataset: "salicon" # "salicon" | "dhf1k" 
+n_epochs: 5
+learning_rate: 1e-4
+weight_decay: 1e-4
+batch_size: 8
+evaluation_steps: 256
+splits: [0.7, 0.15, 0.15]
+use_challenge_split: True
+save_model: True
+with_transforms: True
+
+image_n_levels: 5
+freeze_encoder: False
+freeze_temporal_pipeline: False
+hidden_channels: 32 # TODO: change this variable
+neighbor_radius: 1
+n_iterations: 5
+image_hidden_channels_list: [8, 16, 16, 32]
+depth_hidden_channels_list: [8, 16]
+output_type: "global_direct"
+dropout_rate: 0.0
+with_graph_processing: True
+with_graph_edge_features: True
+with_graph_positional_embeddings: True
+with_graph_directional_kernels: True
+with_depth_information: False
+with_checkpoint: True

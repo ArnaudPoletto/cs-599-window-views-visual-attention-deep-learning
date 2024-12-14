@@ -38,7 +38,7 @@ class LiveSAL(nn.Module):
             raise ValueError(f"❌ Invalid neighbor radius: {neighbor_radius}")
         if n_iterations < 1:
             raise ValueError(f"❌ Invalid number of iterations: {n_iterations}")
-        if output_type not in ["temporal", "global"]:
+        if output_type not in ["temporal", "global", "global_direct"]:
             raise ValueError(f"❌ Invalid output type: {output_type}")
         if freeze_temporal_pipeline and output_type == "temporal":
             raise ValueError("❌ Cannot freeze the temporal pipeline when output type is temporal.")
@@ -203,6 +203,12 @@ class LiveSAL(nn.Module):
 
         if self.output_type == "temporal":
             for param in self.global_decoder.parameters():
+                param.requires_grad = False
+            for param in self.spatio_temporal_mixing_module.parameters():
+                param.requires_grad = False
+
+        if self.output_type == "global_direct":
+            for param in self.temporal_decoder.parameters():
                 param.requires_grad = False
             for param in self.spatio_temporal_mixing_module.parameters():
                 param.requires_grad = False
@@ -386,6 +392,45 @@ class LiveSAL(nn.Module):
         global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
 
         return global_output
+    
+    def _forward_global_direct_pipeline(self, x: torch.Tensor, is_image: bool):
+        # Get image features
+        image_features_list = self._get_image_features_list(x, is_image)
+
+        # Process features if needed
+        if self.with_graph_processing:
+            image_features_list[-1] = self._get_graph_features(
+                features=image_features_list[-1],
+                graph_processor=self.image_graph_processor,
+            )
+
+        if self.with_depth_information:
+            depth_encoded_features_list = self._get_depth_features_list(x, is_image)
+            if self.with_graph_processing:
+                depth_encoded_features_list[-1] = self._get_graph_features(
+                    features=depth_encoded_features_list[-1],
+                    graph_processor=self.depth_graph_processor,
+                )
+            depth_decoded_features = self.depth_decoder(depth_encoded_features_list)
+        else:
+            depth_decoded_features = None
+
+        # Reshape tensors
+        image_features_list = [image_features.view(-1, SEQUENCE_LENGTH, *image_features.shape[1:]) for image_features in image_features_list]
+        # Pool temporal features
+        pooled_image_features_list = [torch.mean(image_features, dim=1) for image_features in image_features_list]
+        if depth_decoded_features is not None:
+            depth_decoded_features = depth_decoded_features.view(-1, SEQUENCE_LENGTH, *depth_decoded_features.shape[1:])
+            pooled_depth_decoded_features = torch.mean(depth_decoded_features, dim=1)
+        else:
+            pooled_depth_decoded_features = None
+
+        # Get global features
+        global_features = self.global_decoder(pooled_image_features_list, pooled_depth_decoded_features)
+        global_output = self.sigmoid(global_features)
+        global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
+
+        return global_output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() == 3:
@@ -413,6 +458,9 @@ class LiveSAL(nn.Module):
             image_features_list, depth_decoded_features, temporal_features, _ = self._forward_temporal_pipeline(x, is_image)
             global_output = self._forward_global_pipeline(image_features_list, depth_decoded_features, temporal_features)
             return None, global_output
-        else:
+        elif self.output_type == "temporal":
             _, _, _, temporal_output = self._forward_temporal_pipeline(x, is_image)
             return temporal_output, None
+        elif self.output_type == "global_direct":
+            global_output = self._forward_global_direct_pipeline(x, is_image)
+            return None, global_output

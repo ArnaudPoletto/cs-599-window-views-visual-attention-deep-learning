@@ -192,7 +192,7 @@ class TempSAL(nn.Module):
         elif self.output_type == "temporal":
             _, _, temporal_output = self._forward_temporal_pipeline(x)
             return temporal_output, None
-        else:
+        elif self.output_type == "global_direct":
             global_output = self._forward_global_direct_pipeline(x)
             return None, global_output
 
