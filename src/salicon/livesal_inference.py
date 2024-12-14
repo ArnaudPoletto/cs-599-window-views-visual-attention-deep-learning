@@ -83,16 +83,16 @@ def main() -> None:
     neighbor_radius = int(config["neighbor_radius"])
     n_iterations = int(config["n_iterations"])
     with_graph_processing = bool(config["with_graph_processing"])
+    image_hidden_channels_list = list(map(int, config["image_hidden_channels_list"]))
+    depth_hidden_channels_list = list(map(int, config["depth_hidden_channels_list"]))
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
-    depth_integration = str(config["depth_integration"])
     output_type = str(config["output_type"])
     dropout_rate = float(config["dropout_rate"])
     with_graph_edge_features = bool(config["with_graph_edge_features"])
     with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
     with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
     with_depth_information = bool(config["with_depth_information"])
-    with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
@@ -115,7 +115,8 @@ def main() -> None:
         hidden_channels=hidden_channels,
         neighbor_radius=neighbor_radius,
         n_iterations=n_iterations,
-        depth_integration=depth_integration,
+        image_hidden_channels_list=image_hidden_channels_list,
+        depth_hidden_channels_list=depth_hidden_channels_list,
         output_type=output_type,
         dropout_rate=dropout_rate,
         with_graph_processing=with_graph_processing,
