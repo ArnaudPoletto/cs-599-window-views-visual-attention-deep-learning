@@ -88,7 +88,7 @@ class LiveSAL(nn.Module):
             )
 
         if with_depth_information:
-            self.depth_estimator = DepthEstimator(freeze=True,)
+            self.depth_estimator = DepthEstimator(freeze=True)
             self.depth_encoder = DepthEncoder(
                 hidden_channels=hidden_channels,
             )
