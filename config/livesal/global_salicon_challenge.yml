@@ -1,9 +1,10 @@
+# SCITAS
 dataset: "salicon" # "salicon" | "dhf1k" 
 n_epochs: 5
 learning_rate: 1e-4
 weight_decay: 1e-4
-batch_size: 4
-evaluation_steps: 512
+batch_size: 8
+evaluation_steps: 32
 splits: [0.7, 0.15, 0.15]
 use_challenge_split: True
 save_model: True
