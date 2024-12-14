@@ -42,7 +42,7 @@ class TempSAL(nn.Module):
             freeze_encoder (bool): Whether to freeze the encoder's parameters.
             hidden_channels_list (List[int]): The number of hidden channels to use in the decoders.
         """
-        if output_type not in ["temporal", "global"]:
+        if output_type not in ["temporal", "global", "global_direct"]:
             raise ValueError(f"❌ Invalid output type: {output_type}")
         if freeze_temporal_pipeline and output_type == "temporal":
             raise ValueError(
@@ -106,6 +106,12 @@ class TempSAL(nn.Module):
             for param in self.spatio_temporal_mixing_module.parameters():
                 param.requires_grad = False
 
+        if output_type == "global_direct":
+            for param in self.temporal_decoder.parameters():
+                param.requires_grad = False
+            for param in self.spatio_temporal_mixing_module.parameters():
+                param.requires_grad = False
+
     def _normalize_input(
         self,
         x: torch.Tensor,
@@ -150,6 +156,20 @@ class TempSAL(nn.Module):
         global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
 
         return global_output
+    
+    def _forward_global_direct_pipeline(
+            self, x: torch.Tensor
+    ) -> torch.Tensor:
+        # Encode the input image
+        x_image = self._normalize_input(x, self.image_mean, self.image_std)
+        encoded_features_list = self.image_encoder(x_image)
+
+        # Decode global features and get global output
+        global_features = self.global_decoder(encoded_features_list)
+        global_output = self.sigmoid(global_features)
+        global_output = self._normalize_spatial_dimensions(global_output).squeeze(1)
+
+        return global_output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -169,6 +189,10 @@ class TempSAL(nn.Module):
                 encoded_features_list, temporal_features
             )
             return None, global_output
-        else:
+        elif self.output_type == "temporal":
             _, _, temporal_output = self._forward_temporal_pipeline(x)
             return temporal_output, None
+        else:
+            global_output = self._forward_global_direct_pipeline(x)
+            return None, global_output
+
