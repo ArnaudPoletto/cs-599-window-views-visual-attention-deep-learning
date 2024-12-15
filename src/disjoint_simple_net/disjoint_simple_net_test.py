@@ -5,14 +5,10 @@ GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
 import os
-import time
-import torch
 import argparse
 import platform
 import multiprocessing
 import lightning.pytorch as pl
-from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import ModelCheckpoint
 
 from src.utils.random import set_seed
 from src.utils.parser import get_config
@@ -24,13 +20,12 @@ from src.lightning_models.lightning_model import LightningModel
 from src.config import (
     SEED,
     N_WORKERS,
-    MODELS_PATH,
     CONFIG_PATH,
+    MODELS_PATH,
     CHECKPOINTS_PATH,
     PROCESSED_DHF1K_PATH,
     PROCESSED_SALICON_PATH,
 )
-
 
 def _get_data_module(
     dataset: str,
@@ -85,7 +80,6 @@ def _get_data_module(
 
     return data_module
 
-
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command line arguments.
@@ -93,7 +87,7 @@ def parse_arguments() -> argparse.Namespace:
     Returns:
         argparse.Namespace: The parsed arguments.
     """
-    parser = argparse.ArgumentParser(description="Train the DisjointSimpleNet model.")
+    parser = argparse.ArgumentParser(description="Process dataset sequences.")
 
     parser.add_argument(
         "--config-file-path",
@@ -106,20 +100,17 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--n-nodes",
-        "-n",
-        type=int,
-        default=1,
-        help="The number of nodes to use for distributed training.",
+        "--checkpoint-file-path",
+        "-checkpoint",
+        "-cp",
+        type=str,
+        default=f"{CHECKPOINTS_PATH}/disjoint_simple_net_temporal_salicon_challenge.ckpt", # TODO: change default
+        help="The path to the checkpoint file.",
     )
 
     return parser.parse_args()
 
-
 def main() -> None:
-    """
-    The main function to train the DisjointSimpleNet model.
-    """
     if platform.system() != "Windows":
         multiprocessing.set_start_method("forkserver", force=True)
     set_seed(SEED)
@@ -127,23 +118,17 @@ def main() -> None:
     # Parse arguments
     args = parse_arguments()
     config_file_path = args.config_file_path
-    n_nodes = args.n_nodes
+    checkpoint_file_path = args.checkpoint_file_path
 
     # Get config parameters
     config = get_config(config_file_path)
     dataset = str(config["dataset"])
-    n_epochs = int(config["n_epochs"])
-    learning_rate = float(config["learning_rate"])
-    weight_decay = float(config["weight_decay"])
     batch_size = int(config["batch_size"])
-    evaluation_steps = int(config["evaluation_steps"])
     splits = tuple(map(float, config["splits"]))
-    save_model = bool(config["save_model"])
     with_transforms = bool(config["with_transforms"])
     freeze_encoder = bool(config["freeze_encoder"])
     hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     dropout_rate = float(config["dropout_rate"])
-    with_checkpoint = bool(config["with_checkpoint"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
@@ -163,63 +148,29 @@ def main() -> None:
         hidden_channels_list=hidden_channels_list,
         dropout_rate=dropout_rate,
     )
-    if with_checkpoint:
-        checkpoint_file_path = f"{CHECKPOINTS_PATH}/disjoint_simple_net_temporal.ckpt"
-        if not os.path.exists(checkpoint_file_path):
-            raise FileNotFoundError(f"❌ File {Path(checkpoint_file_path).resolve()} not found.")
-        lightning_model = LightningModel.load_from_checkpoint(
-            checkpoint_path=checkpoint_file_path,
-            model=model,
-            learning_rate=learning_rate,
-            weight_decay=weight_decay,
-            name="disjoint_simple_net",
-            dataset=dataset,
+    if not os.path.exists(checkpoint_file_path):
+        raise FileNotFoundError(
+            f"❌ File {Path(checkpoint_file_path).resolve()} not found."
         )
-    else:
-        lightning_model = LightningModel(
-            model=model,
-            learning_rate=learning_rate,
-            weight_decay=weight_decay,
-            name="disjoint_simple_net",
-            dataset=dataset
-        )
-
-    # Get trainer and train
-    wandb_name = f"{time.strftime('%Y%m%d-%H%M%S')}_disjoint_simple_net"
-    wandb_logger = WandbLogger(
-        project="thesis",
-        name=wandb_name,
-        config=config,
+    lightning_model = LightningModel.load_from_checkpoint(
+        checkpoint_path=checkpoint_file_path,
+        model=model,
+        name="disjoint_simple_net",
+        dataset="salicon",
     )
+    print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}")
 
-    if save_model:
-        checkpoint_callback = ModelCheckpoint(
-            dirpath=f"{MODELS_PATH}/disjoint_simple_net/{wandb_name}",
-            filename="{epoch}-{val_loss:.2f}",
-            save_top_k=3,
-            monitor="val_loss",
-            mode="min",
-        )
-        callbacks = [checkpoint_callback]
-    else:
-        callbacks = []
-
+    # Get trainer and predict
     trainer = pl.Trainer(
-        max_epochs=n_epochs,
         accelerator="gpu",
-        devices=-1,
-        num_nodes=n_nodes,
-        precision=16,
-        strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
-        val_check_interval=evaluation_steps,
-        logger=wandb_logger,
-        callbacks=callbacks,
+        devices=1,
+        enable_checkpointing=False,
+        logger=False,
     )
 
-    trainer.fit(
-        model=lightning_model,
-        datamodule=data_module,
-    )
+    metrics = trainer.test(lightning_model, datamodule=data_module)
+
+    print(f"✅ Test metrics: {metrics}")
 
 if __name__ == "__main__":
     main()
