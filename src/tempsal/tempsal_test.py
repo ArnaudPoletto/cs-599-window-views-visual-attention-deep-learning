@@ -5,19 +5,14 @@ GLOBAL_DIR = Path(__file__).parent / ".." / ".."
 sys.path.append(str(GLOBAL_DIR))
 
 import os
-import time
-import torch
 import argparse
 import platform
 import multiprocessing
 import lightning.pytorch as pl
-from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import ModelCheckpoint
 
 from src.utils.random import set_seed
 from src.models.tempsal import TempSAL
 from src.utils.parser import get_config
-from src.utils.file import get_paths_recursive
 from src.datasets.salicon_dataset import SaliconDataModule
 from src.lightning_models.lightning_model import LightningModel
 from src.config import (
