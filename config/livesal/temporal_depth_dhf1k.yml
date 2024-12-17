@@ -2,8 +2,8 @@ dataset: "dhf1k" # "salicon" | "dhf1k"
 n_epochs: 10
 learning_rate: 1e-4
 weight_decay: 1e-3
-batch_size: 2
-evaluation_steps: 1024
+batch_size: 1
+evaluation_steps: 2048
 splits: [0.5, 0.25, 0.25]
 use_challenge_split: False
 save_model: True
