@@ -95,7 +95,6 @@ def parse_arguments() -> argparse.Namespace:
         "-conf",
         "-c",
         type=str,
-        default=f"{CONFIG_PATH}/disjoint_simple_net/salicon_challenge.yml",
         help="The path to the config file.",
     )
 
@@ -104,7 +103,6 @@ def parse_arguments() -> argparse.Namespace:
         "-checkpoint",
         "-cp",
         type=str,
-        default=f"{CHECKPOINTS_PATH}/disjoint_simple_net_temporal_salicon_challenge.ckpt", # TODO: change default
         help="The path to the checkpoint file.",
     )
 

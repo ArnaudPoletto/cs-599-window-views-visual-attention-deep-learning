@@ -1,12 +1,11 @@
-# SCITAS
-dataset: "salicon" # "salicon" | "dhf1k" 
-n_epochs: 5
+dataset: "dhf1k" # "salicon" | "dhf1k" 
+n_epochs: 10
 learning_rate: 1e-4
-weight_decay: 1e-4
-batch_size: 8
-evaluation_steps: 32
+weight_decay: 1e-3
+batch_size: 4
+evaluation_steps: 512
 splits: [0.5, 0.25, 0.25]
-use_challenge_split: True
+use_challenge_split: False
 save_model: True
 with_transforms: True
 
@@ -19,10 +18,10 @@ n_iterations: 5
 image_hidden_channels_list: [8, 16, 16, 32]
 depth_hidden_channels_list: [8, 16]
 output_type: "temporal"
-dropout_rate: 0.5
+dropout_rate: 0.0
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True
 with_graph_directional_kernels: True
-with_depth_information: True
+with_depth_information: False
 with_checkpoint: False

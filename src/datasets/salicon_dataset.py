@@ -64,6 +64,7 @@ class SaliconDataset(Dataset):
             contrast_factor = random.uniform(0.9, 1.1)
             saturation_factor = random.uniform(0.9, 1.1)
             hue_factor = random.uniform(-0.05, 0.05)
+            do_blur = random.random() > 0.5
             sigma = random.uniform(0.1, 0.5)
 
             # Apply flips
@@ -116,7 +117,8 @@ class SaliconDataset(Dataset):
             frame = TF.adjust_hue(frame, hue_factor)
 
             # Apply Gaussian blur
-            frame = TF.gaussian_blur(frame, kernel_size=3, sigma=sigma)
+            if do_blur:
+                frame = TF.gaussian_blur(frame, kernel_size=3, sigma=sigma)
 
         return frame, ground_truths, global_ground_truth
 

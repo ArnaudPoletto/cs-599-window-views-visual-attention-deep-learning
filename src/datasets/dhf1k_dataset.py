@@ -84,51 +84,84 @@ class DHF1KDataset(Dataset):
         return len(self.samples)
 
     def _apply_transforms(
-        self, frames: List[np.ndarray], ground_truths: List[np.ndarray]
+        self,
+        frames: List[np.ndarray],
+        ground_truths: List[np.ndarray],
     ) -> Tuple[np.ndarray, np.ndarray]:
-        # Resize frames and ground truths
-        frames = [TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE)) for frame in frames]
-        ground_truths = [
-            TF.resize(gt, (IMAGE_SIZE, IMAGE_SIZE)) for gt in ground_truths
-        ]
-
         if self.with_transforms:
-            do_flip = random.random() > 0.5
-            do_rotate = random.random() > 0.5
+            do_hflip = random.random() > 0.5
+            do_vflip = random.random() > 1.0
+            do_rotate = random.random() > 1.0
+            do_zoom = random.random() > 1.0
             angle = random.uniform(-15, 15) if do_rotate else 0
+            zoom_factor = random.uniform(1.0, 1.2)
             brightness_factor = random.uniform(0.9, 1.1)
             contrast_factor = random.uniform(0.9, 1.1)
             saturation_factor = random.uniform(0.9, 1.1)
             hue_factor = random.uniform(-0.05, 0.05)
+            do_blur = random.random() > 0.5
             sigma = random.uniform(0.1, 0.5)
 
-            transformed_frames = []
-            transformed_ground_truths = []
-            for frame, ground_truth in zip(frames, ground_truths):
-                # Apply flip
-                if do_flip:
+            # Apply flips
+            if do_hflip:
+                transformed_frames = []
+                for frame in frames:
                     frame = TF.hflip(frame)
+                    transformed_frames.append(frame)
+                frames = transformed_frames
+                transformed_ground_truths = []
+                for ground_truth in ground_truths:
                     ground_truth = TF.hflip(ground_truth)
+                    transformed_ground_truths.append(ground_truth)
+                ground_truths = transformed_ground_truths
+            if do_vflip:
+                transformed_frames = []
+                for frame in frames:
+                    frame = TF.vflip(frame)
+                    transformed_frames.append(frame)
+                frames = transformed_frames
+                transformed_ground_truths = []
+                for ground_truth in ground_truths:
+                    ground_truth = TF.vflip(ground_truth)
+                    transformed_ground_truths.append(ground_truth)
+                ground_truths = transformed_ground_truths
 
-                # Apply rotation
-                if do_rotate:
+            # Apply rotation
+            if do_rotate:
+                transformed_frames = []
+                for frame in frames:
                     frame = TF.rotate(frame, angle, fill=0)
+                    transformed_frames.append(frame)
+                frames = transformed_frames
+                transformed_ground_truths = []
+                for ground_truth in ground_truths:
                     ground_truth = TF.rotate(ground_truth, angle, fill=0)
+                    transformed_ground_truths.append(ground_truth)
+                ground_truths = transformed_ground_truths
 
-                # Apply color transforms
+            # Apply zoom
+            if do_zoom:
+                w, h = frame.size
+                crop_w = int(w / zoom_factor)
+                crop_h = int(h / zoom_factor)
+                left = (w - crop_w) // 2
+                top = (h - crop_h) // 2
+                frames = [TF.resized_crop(frame, top, left, crop_h, crop_w, (h, w)) for frame in frames]
+                ground_truths = [
+                    TF.resized_crop(gt, top, left, crop_h, crop_w, (h, w)) for gt in ground_truths
+                ]
+
+            # Apply color transforms
+            transformed_frames = []
+            for frame in frames:
                 frame = TF.adjust_brightness(frame, brightness_factor)
                 frame = TF.adjust_contrast(frame, contrast_factor)
                 frame = TF.adjust_saturation(frame, saturation_factor)
                 frame = TF.adjust_hue(frame, hue_factor)
-
-                # Apply Gaussian blur
-                frame = TF.gaussian_blur(frame, kernel_size=3, sigma=sigma)
-
+                if do_blur:
+                    frame = TF.gaussian_blur(frame, kernel_size=3, sigma=sigma)
                 transformed_frames.append(frame)
-                transformed_ground_truths.append(ground_truth)
-
             frames = transformed_frames
-            ground_truths = transformed_ground_truths
 
         return frames, ground_truths
 
@@ -136,31 +169,38 @@ class DHF1KDataset(Dataset):
         self, index: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         sample = self.samples[index]
-        frames, ground_truths = sample
+        frame_file_paths, ground_truth_file_paths = sample
+        sample_id = int(frame_file_paths[0].split("/")[-3])
 
-        # Get frames and ground truths and apply transforms
-        frames = [Image.open(frame).convert("RGB") for frame in frames]
+        # Get frames
+        frame_file_paths = natsorted(frame_file_paths)
+        frames = [Image.open(frame_file_path).convert("RGB") for frame_file_path in frame_file_paths]
+        frames = [TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE)) for frame in frames]
+
+        # Get ground truths
+        ground_truth_file_paths = natsorted(ground_truth_file_paths)
         ground_truths = [
-            Image.open(ground_truth).convert("L") for ground_truth in ground_truths
+            Image.open(ground_truth_file_path).convert("L") for ground_truth_file_path in ground_truth_file_paths
         ]
+        ground_truths = [TF.resize(ground_truth, (IMAGE_SIZE, IMAGE_SIZE)) for ground_truth in ground_truths]
+
+        # Apply transforms
         frames, ground_truths = self._apply_transforms(frames, ground_truths)
 
         # Convert to torch tensors
         frames = [TF.to_tensor(frame).float() for frame in frames]
         frames = torch.stack(frames, axis=0)
         ground_truths = [TF.to_tensor(ground_truth).float() for ground_truth in ground_truths]
+        ground_truths = [
+            ground_truth / ground_truth.max() for ground_truth in ground_truths
+        ]
         ground_truths = torch.stack(ground_truths, axis=0).squeeze(1)
 
         # Get global ground truth
         global_ground_truth = torch.mean(ground_truths, axis=0)
-        min_val = global_ground_truth.min()
-        max_val = global_ground_truth.max()
-        if min_val == max_val:
-            global_ground_truth = torch.zeros_like(global_ground_truth)
-        else:
-            global_ground_truth = (global_ground_truth - min_val) / (max_val - min_val)
+        global_ground_truth = global_ground_truth / global_ground_truth.max()
 
-        return frames, ground_truths, global_ground_truth
+        return frames, ground_truths, global_ground_truth, sample_id
 
 
 class DHF1KDataModule(pl.LightningDataModule):

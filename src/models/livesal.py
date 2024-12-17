@@ -56,6 +56,8 @@ class LiveSAL(nn.Module):
         self.image_hidden_channels_list = image_hidden_channels_list
         self.depth_hidden_channels_list = depth_hidden_channels_list
         self.dropout_rate = dropout_rate
+        with_global_positional_embeddings = True # TODO: change this
+        self.with_global_positional_embeddings = with_global_positional_embeddings
         self.with_graph_processing = with_graph_processing
         self.with_graph_edge_features = with_graph_edge_features
         self.with_graph_positional_embeddings = with_graph_positional_embeddings
@@ -142,9 +144,14 @@ class LiveSAL(nn.Module):
             for in_channels, out_channels in zip(projection_in_channels_list, projection_channels_list)
         ])
 
+        image_last_layer_channels = projection_channels_list[-1]
+        image_last_layer_size = self.image_encoder.feature_sizes[-1]
+        if self.with_global_positional_embeddings:
+            self.global_positional_embeddings = nn.Parameter(
+                torch.randn(SEQUENCE_LENGTH, image_last_layer_channels, image_last_layer_size, image_last_layer_size)
+            )
+
         if with_graph_processing:
-            image_last_layer_channels = projection_channels_list[-1]
-            image_last_layer_size = self.image_encoder.feature_sizes[-1]
             self.image_graph_processor = GraphProcessor(
                 channels=image_last_layer_channels,
                 size=image_last_layer_size,
@@ -274,6 +281,19 @@ class LiveSAL(nn.Module):
 
         return image_features_list
     
+    def _add_positional_embeddings(
+        self, x: torch.Tensor, positional_embeddings: torch.Tensor
+    ) -> torch.Tensor:
+        batch_size_sequence_length, channels, height, width = x.shape
+        batch_size = batch_size_sequence_length // SEQUENCE_LENGTH
+        positional_embeddings = positional_embeddings.unsqueeze(0).repeat(
+            batch_size, 1, 1, 1, 1
+        ).view(batch_size_sequence_length, channels, height, width)
+
+        x = x + positional_embeddings
+
+        return x
+    
     def _get_graph_features(
         self, features: torch.Tensor, graph_processor: GraphProcessor
     ) -> torch.Tensor:
@@ -350,6 +370,12 @@ class LiveSAL(nn.Module):
                 features=image_features_list[-1],
                 graph_processor=self.image_graph_processor,
             )
+
+        # Add positional embeddings
+        image_features_list[-1] = self._add_positional_embeddings(
+            image_features_list[-1],
+            self.global_positional_embeddings,
+        )
 
         if self.with_depth_information:
             depth_encoded_features_list = self._get_depth_features_list(x, is_image)

@@ -11,8 +11,10 @@ import multiprocessing
 import lightning.pytorch as pl
 
 from src.utils.random import set_seed
-from src.models.tempsal import TempSAL
+from src.models.livesal import LiveSAL
 from src.utils.parser import get_config
+from src.utils.file import get_paths_recursive
+from src.datasets.dhf1k_dataset import DHF1KDataModule
 from src.datasets.salicon_dataset import SaliconDataModule
 from src.lightning_models.lightning_model import LightningModel
 from src.config import (
@@ -21,21 +23,24 @@ from src.config import (
     CONFIG_PATH,
     MODELS_PATH,
     CHECKPOINTS_PATH,
+    PROCESSED_DHF1K_PATH,
     PROCESSED_SALICON_PATH,
 )
 
 def _get_data_module(
+    dataset: str,
     batch_size: int,
     train_split: float,
     val_split: float,
     test_split: float,
     use_challenge_split: bool,
     with_transforms: bool,
-) -> SaliconDataModule:
+) -> SaliconDataModule | DHF1KDataModule:
     """
-    Get the SALICON data module.
+    Get the data module for the dataset.
 
     Args:
+        dataset (str): The dataset to use.
         batch_size (int): The batch size.
         train_split (float): The train split.
         val_split (float): The validation split.
@@ -45,16 +50,33 @@ def _get_data_module(
     Returns:
         Any: The data module.
     """
-    data_module = SaliconDataModule(
-        batch_size=batch_size,
-        train_split=train_split,
-        val_split=val_split,
-        test_split=test_split,
-        use_challenge_split=use_challenge_split,
-        with_transforms=with_transforms,
-        n_workers=N_WORKERS,
-        seed=SEED,
-    )
+    if dataset == "salicon":
+        data_module = SaliconDataModule(
+            batch_size=batch_size,
+            train_split=train_split,
+            val_split=val_split,
+            test_split=test_split,
+            use_challenge_split=use_challenge_split,
+            with_transforms=with_transforms,
+            n_workers=N_WORKERS,
+            seed=SEED,
+        )
+    elif dataset == "dhf1k":
+        sample_folder_paths = get_paths_recursive(
+            folder_path=PROCESSED_DHF1K_PATH, match_pattern="*", path_type="d"
+        )
+        data_module = DHF1KDataModule(
+            sample_folder_paths=sample_folder_paths,
+            batch_size=batch_size,
+            train_split=train_split,
+            val_split=val_split,
+            test_split=test_split,
+            with_transforms=with_transforms,
+            n_workers=N_WORKERS,
+            seed=SEED,
+        )
+    else:
+        raise ValueError(f"❌ Unknown dataset {dataset}.")
 
     return data_module
 
@@ -98,19 +120,31 @@ def main() -> None:
 
     # Get config parameters
     config = get_config(config_file_path)
+    dataset = str(config["dataset"])
     batch_size = int(config["batch_size"])
     splits = tuple(map(float, config["splits"]))
     use_challenge_split = bool(config["use_challenge_split"])
     with_transforms = bool(config["with_transforms"])
+    image_n_levels = int(config["image_n_levels"])
+    hidden_channels = int(config["hidden_channels"])
+    neighbor_radius = int(config["neighbor_radius"])
+    n_iterations = int(config["n_iterations"])
+    image_hidden_channels_list = list(map(int, config["image_hidden_channels_list"]))
+    depth_hidden_channels_list = list(map(int, config["depth_hidden_channels_list"]))
     freeze_encoder = bool(config["freeze_encoder"])
     freeze_temporal_pipeline = bool(config["freeze_temporal_pipeline"])
-    hidden_channels_list = list(map(int, config["hidden_channels_list"]))
     output_type = str(config["output_type"])
     dropout_rate = float(config["dropout_rate"])
+    with_graph_processing = bool(config["with_graph_processing"])
+    with_graph_edge_features = bool(config["with_graph_edge_features"])
+    with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
+    with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
+    with_depth_information = bool(config["with_depth_information"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
     data_module = _get_data_module(
+        dataset=dataset,
         batch_size=batch_size,
         train_split=splits[0],
         val_split=splits[1],
@@ -120,13 +154,24 @@ def main() -> None:
     )
 
     # Get model
-    model = TempSAL(
+    model = LiveSAL(
+        image_n_levels=image_n_levels,
         freeze_encoder=freeze_encoder,
         freeze_temporal_pipeline=freeze_temporal_pipeline,
-        hidden_channels_list=hidden_channels_list,
+        hidden_channels=hidden_channels,
+        neighbor_radius=neighbor_radius,
+        n_iterations=n_iterations,
+        image_hidden_channels_list=image_hidden_channels_list,
+        depth_hidden_channels_list=depth_hidden_channels_list,
         output_type=output_type,
         dropout_rate=dropout_rate,
+        with_graph_processing=with_graph_processing,
+        with_graph_edge_features=with_graph_edge_features,
+        with_graph_positional_embeddings=with_graph_positional_embeddings,
+        with_graph_directional_kernels=with_graph_directional_kernels,
+        with_depth_information=with_depth_information,
     )
+
     if not os.path.exists(checkpoint_file_path):
         raise FileNotFoundError(
             f"❌ File {Path(checkpoint_file_path).resolve()} not found."
@@ -134,7 +179,7 @@ def main() -> None:
     lightning_model = LightningModel.load_from_checkpoint(
         checkpoint_path=checkpoint_file_path,
         model=model,
-        name="tempsal",
+        name="livesal",
         dataset="salicon",
     )
     print(f"✅ Loaded temporal model from {Path(checkpoint_file_path).resolve()}")
