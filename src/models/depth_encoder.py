@@ -43,4 +43,4 @@ class DepthEncoder(nn.Module):
         x2 = self.conv2(x1)
         x3 = self.conv3(x2)
         
-        return x1, x2, x3
+        return [x1, x2, x3]
