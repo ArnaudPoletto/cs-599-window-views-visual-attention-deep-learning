@@ -1,11 +1,11 @@
-dataset: "dhf1k" # "salicon" | "dhf1k" 
+dataset: "salicon" # "salicon" | "dhf1k" 
 n_epochs: 10
 learning_rate: 1e-4
 weight_decay: 1e-3
 batch_size: 4
 evaluation_steps: 512
 splits: [0.5, 0.25, 0.25]
-use_challenge_split: False
+use_challenge_split: True
 save_model: True
 with_transforms: True
 
