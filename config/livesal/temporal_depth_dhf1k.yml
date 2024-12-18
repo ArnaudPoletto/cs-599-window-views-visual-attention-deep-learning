@@ -1,6 +1,6 @@
 dataset: "dhf1k" # "salicon" | "dhf1k" 
 n_epochs: 10
-learning_rate: 1e-4
+learning_rate: 1e-5
 weight_decay: 1e-3
 batch_size: 1
 evaluation_steps: 2048
@@ -18,7 +18,7 @@ n_iterations: 5
 image_hidden_channels_list: [8, 16, 16, 32]
 depth_hidden_channels_list: [8, 16]
 output_type: "temporal"
-dropout_rate: 0.0
+dropout_rate: 0.2
 with_graph_processing: True
 with_graph_edge_features: True
 with_graph_positional_embeddings: True

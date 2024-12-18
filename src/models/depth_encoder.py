@@ -26,7 +26,12 @@ class DepthEncoder(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-        self.features_channels_list = [hidden_channels//4, hidden_channels//2, hidden_channels]
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.ReLU(inplace=True)
+        )
+
+        self.features_channels_list = [hidden_channels//4, hidden_channels//2, hidden_channels, hidden_channels]
         self.features_sizes = self._get_features_sizes()
 
     def _get_features_sizes(self) -> int:
@@ -42,5 +47,6 @@ class DepthEncoder(nn.Module):
         x1 = self.conv1(x)
         x2 = self.conv2(x1)
         x3 = self.conv3(x2)
+        x4 = self.conv4(x3)
         
-        return [x1, x2, x3]
+        return [x1, x2, x3, x4]
