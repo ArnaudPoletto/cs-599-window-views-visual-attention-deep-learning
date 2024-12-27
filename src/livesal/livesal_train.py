@@ -14,11 +14,14 @@ import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
+
 from src.utils.random import set_seed
 from src.models.livesal import LiveSAL
 from src.utils.parser import get_config
 from src.utils.file import get_paths_recursive
 from src.datasets.dhf1k_dataset import DHF1KDataModule
+from src.datasets.viewout_dataset import ViewOutDataModule
 from src.datasets.salicon_dataset import SaliconDataModule
 from src.lightning_models.lightning_model import LightningModel
 from src.config import (
@@ -28,7 +31,7 @@ from src.config import (
     CONFIG_PATH,
     CHECKPOINTS_PATH,
     PROCESSED_DHF1K_PATH,
-    PROCESSED_SALICON_PATH,
+    PROCESSED_VIEWOUT_PATH,
 )
 
 
@@ -68,7 +71,7 @@ def _get_data_module(
         )
     elif dataset == "dhf1k":
         sample_folder_paths = get_paths_recursive(
-            folder_path=PROCESSED_DHF1K_PATH, match_pattern="*", path_type="d"
+            folder_path=PROCESSED_DHF1K_PATH, match_pattern="*", path_type="d", recursive=False
         )
         data_module = DHF1KDataModule(
             sample_folder_paths=sample_folder_paths,
@@ -76,6 +79,13 @@ def _get_data_module(
             train_split=train_split,
             val_split=val_split,
             test_split=test_split,
+            with_transforms=with_transforms,
+            n_workers=N_WORKERS,
+            seed=SEED,
+        )
+    elif dataset == "viewout":
+        data_module = ViewOutDataModule(
+            batch_size=batch_size,
             with_transforms=with_transforms,
             n_workers=N_WORKERS,
             seed=SEED,
@@ -191,7 +201,9 @@ def main() -> None:
     if with_checkpoint:
         checkpoint_file_path = f"{CHECKPOINTS_PATH}/livesal_temporal.ckpt"
         if not os.path.exists(checkpoint_file_path):
-            raise FileNotFoundError(f"❌ File {Path(checkpoint_file_path).resolve()} not found.")
+            raise FileNotFoundError(
+                f"❌ File {Path(checkpoint_file_path).resolve()} not found."
+            )
         lightning_model = LightningModel.load_from_checkpoint(
             checkpoint_path=checkpoint_file_path,
             model=model,

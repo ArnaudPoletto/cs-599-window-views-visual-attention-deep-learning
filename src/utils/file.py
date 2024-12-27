@@ -7,9 +7,6 @@ sys.path.append(str(GLOBAL_DIR))
 from typing import List, Tuple
 from pathlib import Path
 
-from src.config import SAMPLES_PATH
-
-
 def get_paths_recursive(
     folder_path: str,
     match_pattern: str,
@@ -143,22 +140,3 @@ def get_ids_from_file_path(file_path: str) -> Tuple[int, int, int]:
     scene_id = get_scene_id_from_file_path(file_path)
 
     return experiment_id, set_id, scene_id
-
-
-def get_sample_paths_list() -> List[List[str]]:
-    """
-    Get sample files and group by folder.
-
-    Returns:
-    List[List[str]]: List of list of sample files
-    """
-    sample_paths_list = get_paths_recursive(SAMPLES_PATH, "*.pkl", "f")
-    sample_paths_dict = {}
-    for path in sample_paths_list:
-        folder_path = "/".join(path.split("/")[:-1])
-        if folder_path not in sample_paths_dict:
-            sample_paths_dict[folder_path] = []
-        sample_paths_dict[folder_path].append(path)
-    sample_paths_list = list(sample_paths_dict.values())
-
-    return sample_paths_list

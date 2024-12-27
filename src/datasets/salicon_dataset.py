@@ -35,14 +35,6 @@ class SaliconDataset(Dataset):
 
         self.sample_folder_paths = sample_folder_paths
         self.with_transforms = with_transforms
-        self.input_transforms = transforms.Compose(
-            [
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05
-                ),
-                transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
-            ]
-        )
 
     def __len__(self) -> int:
         return len(self.sample_folder_paths)

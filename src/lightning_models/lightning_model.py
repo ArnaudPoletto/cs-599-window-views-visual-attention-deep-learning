@@ -17,9 +17,10 @@ from src.metrics.metrics import Metrics
 from src.losses.combined import CombinedLoss
 from src.losses.correlation_coefficient import CorrelationCoefficientLoss
 from src.config import (
+    DHF1K_PATH,
     LOSS_WEIGHTS,
     SALICON_PATH, 
-    DHF1K_PATH,
+    VIEWOUT_PATH,
 )
 
 
@@ -119,6 +120,9 @@ class LightningModel(pl.LightningModule):
             center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(self.device)
         elif self.dataset == "dhf1k":
             center_bias_path = f"{DHF1K_PATH}/center_bias.jpg"
+            center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(self.device)
+        elif self.dataset == "viewout":
+            center_bias_path = f"{VIEWOUT_PATH}/center_bias.jpg"
             center_bias = torch.tensor(np.array(Image.open(center_bias_path).convert("L"))).float().to(self.device)
         
         # Calculate metrics

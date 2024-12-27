@@ -16,16 +16,16 @@ from torchvision.transforms import functional as TF
 
 from src.utils.random import set_seed
 from src.utils.file import get_paths_recursive
-from src.config import SEQUENCE_LENGTH, IMAGE_SIZE
+from src.config import SEQUENCE_LENGTH, IMAGE_SIZE, PROCESSED_VIEWOUT_PATH
 
 
-class DHF1KDataset(Dataset):
+class ViewOutDataset(Dataset):
     def __init__(
         self,
-        sample_folder_paths: List[str],
+        sample_folder_paths: List[List[str]],
         with_transforms: bool,
     ) -> None:
-        super(DHF1KDataset, self).__init__()
+        super(ViewOutDataset, self).__init__()
 
         self.sample_folder_paths = sample_folder_paths
         self.with_transforms = with_transforms
@@ -34,19 +34,23 @@ class DHF1KDataset(Dataset):
     def _get_samples(self) -> List[Tuple[List[str], List[str]]]:
         samples = []
         for sample_folder_path in self.sample_folder_paths:
-            # Get frames and ground truth paths
+            # Get frames and ground_truth paths
             frames_folder_path = f"{sample_folder_path}/frames"
             ground_truths_folder_path = f"{sample_folder_path}/ground_truths"
             frames = get_paths_recursive(
-                folder_path=frames_folder_path, match_pattern="*_1.jpg", path_type="f"
-            )  # TODO: Only first frame for now
+                folder_path=frames_folder_path,
+                match_pattern="*_00000.jpg",
+                path_type="f",
+                recursive=False,
+            )
             ground_truths = get_paths_recursive(
                 folder_path=ground_truths_folder_path,
                 match_pattern="ground_truth_*.jpg",
                 path_type="f",
+                recursive=False,
             )
 
-            # Sort frames and ground truths paths
+            # Sort frames and ground_truth paths
             frames = natsorted(frames)
             ground_truths = natsorted(ground_truths)
 
@@ -137,9 +141,13 @@ class DHF1KDataset(Dataset):
                 crop_h = int(h / zoom_factor)
                 left = (w - crop_w) // 2
                 top = (h - crop_h) // 2
-                frames = [TF.resized_crop(frame, top, left, crop_h, crop_w, (h, w)) for frame in frames]
+                frames = [
+                    TF.resized_crop(frame, top, left, crop_h, crop_w, (h, w))
+                    for frame in frames
+                ]
                 ground_truths = [
-                    TF.resized_crop(gt, top, left, crop_h, crop_w, (h, w)) for gt in ground_truths
+                    TF.resized_crop(gt, top, left, crop_h, crop_w, (h, w))
+                    for gt in ground_truths
                 ]
 
             # Apply color transforms
@@ -161,19 +169,26 @@ class DHF1KDataset(Dataset):
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         sample = self.samples[index]
         frame_file_paths, ground_truth_file_paths = sample
-        sample_id = int(frame_file_paths[0].split("/")[-3])
+        sample_id = index
 
         # Get frames
         frame_file_paths = natsorted(frame_file_paths)
-        frames = [Image.open(frame_file_path).convert("RGB") for frame_file_path in frame_file_paths]
+        frames = [
+            Image.open(frame_file_path).convert("RGB")
+            for frame_file_path in frame_file_paths
+        ]
         frames = [TF.resize(frame, (IMAGE_SIZE, IMAGE_SIZE)) for frame in frames]
 
         # Get ground truths
         ground_truth_file_paths = natsorted(ground_truth_file_paths)
         ground_truths = [
-            Image.open(ground_truth_file_path).convert("L") for ground_truth_file_path in ground_truth_file_paths
+            Image.open(ground_truth_file_path).convert("L")
+            for ground_truth_file_path in ground_truth_file_paths
         ]
-        ground_truths = [TF.resize(ground_truth, (IMAGE_SIZE, IMAGE_SIZE)) for ground_truth in ground_truths]
+        ground_truths = [
+            TF.resize(ground_truth, (IMAGE_SIZE, IMAGE_SIZE))
+            for ground_truth in ground_truths
+        ]
 
         # Apply transforms
         frames, ground_truths = self._apply_transforms(frames, ground_truths)
@@ -181,7 +196,9 @@ class DHF1KDataset(Dataset):
         # Convert to torch tensors
         frames = [TF.to_tensor(frame).float() for frame in frames]
         frames = torch.stack(frames, axis=0)
-        ground_truths = [TF.to_tensor(ground_truth).float() for ground_truth in ground_truths]
+        ground_truths = [
+            TF.to_tensor(ground_truth).float() for ground_truth in ground_truths
+        ]
         ground_truths = [
             ground_truth / ground_truth.max() for ground_truth in ground_truths
         ]
@@ -194,24 +211,16 @@ class DHF1KDataset(Dataset):
         return frames, ground_truths, global_ground_truth, sample_id
 
 
-class DHF1KDataModule(pl.LightningDataModule):
+class ViewOutDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        sample_folder_paths: List[str],
         batch_size: int,
-        train_split: float,
-        val_split: float,
-        test_split: float,
         with_transforms: bool,
         n_workers: int,
         seed: Optional[int] = None,
     ):
         super().__init__()
-        self.sample_folder_paths = sample_folder_paths
         self.batch_size = batch_size
-        self.train_split = train_split
-        self.val_split = val_split
-        self.test_split = test_split
         self.with_transforms = with_transforms
         self.n_workers = n_workers
         self.seed = seed
@@ -220,43 +229,71 @@ class DHF1KDataModule(pl.LightningDataModule):
         self.val_dataset: Optional[Dataset] = None
         self.test_dataset: Optional[Dataset] = None
 
-    def setup(self, stage: Optional[str] = None):
-        if not np.isclose(self.train_split + self.val_split + self.test_split, 1.0):
-            raise ValueError(
-                "❌ The sum of the train, validation, and test splits must be equal to 1."
-            )
+        train_sample_folder_paths, val_sample_folder_paths = self._get_splitted_sample_folder_paths()
+        self.train_sample_folder_paths = train_sample_folder_paths
+        self.val_sample_folder_paths = val_sample_folder_paths
 
+    def _get_splitted_sample_folder_paths(self) -> List[str]:
+        sample_folder_paths_1 = natsorted(get_paths_recursive(
+            folder_path=f"{PROCESSED_VIEWOUT_PATH}/experiment1/videos",
+            match_pattern="*",
+            path_type="d",
+            recursive=False,
+        ))
+        sample_folder_paths_2 = natsorted(get_paths_recursive(
+            folder_path=f"{PROCESSED_VIEWOUT_PATH}/experiment2/clear",
+            match_pattern="*",
+            path_type="d",
+            recursive=False,
+        ))
+        sample_folder_paths_3 = natsorted(get_paths_recursive(
+            folder_path=f"{PROCESSED_VIEWOUT_PATH}/experiment2/overcast",
+            match_pattern="*",
+            path_type="d",
+            recursive=False,
+        ))
+
+        train_indexes_1 = [2, 4, 5, 6, 7, 8, 9, 10, 12, 14]
+        val_indexes_1 = [0, 1, 3, 11, 13]
+        train_indexes_23 = [2, 3, 4, 5, 7, 9]
+        val_indexes_23 = [0, 1, 6, 8]
+
+        train_sample_folder_paths = [
+            sample_folder_paths_1[i] for i in train_indexes_1
+        ] + [
+            sample_folder_paths_2[i] for i in train_indexes_23
+        ] + [
+            sample_folder_paths_3[i] for i in train_indexes_23
+        ]
+        val_sample_folder_paths = [
+            sample_folder_paths_1[i] for i in val_indexes_1
+        ] + [
+            sample_folder_paths_2[i] for i in val_indexes_23
+        ] + [
+            sample_folder_paths_3[i] for i in val_indexes_23
+        ]
+
+        return train_sample_folder_paths, val_sample_folder_paths
+
+    def setup(self, stage: Optional[str] = None):
         if self.seed is not None:
             print(f"🌱 Setting the seed to {self.seed} for generating dataloaders.")
             set_seed(self.seed)
 
-        # Split indices
-        sample_indices = np.arange(len(self.sample_folder_paths))
-        np.random.shuffle(sample_indices)
-
-        train_samples = int(self.train_split * len(sample_indices))
-        val_samples = int(self.val_split * len(sample_indices))
-
-        train_indices = sample_indices[:train_samples]
-        val_indices = sample_indices[train_samples : train_samples + val_samples]
-        test_indices = sample_indices[train_samples + val_samples :]
-
         # Create datasets
         if stage == "fit" or stage is None:
-            self.train_dataset = DHF1KDataset(
-                sample_folder_paths=[
-                    self.sample_folder_paths[i] for i in train_indices
-                ],
+            self.train_dataset = ViewOutDataset(
+                sample_folder_paths=self.train_sample_folder_paths,
                 with_transforms=self.with_transforms,
             )
-            self.val_dataset = DHF1KDataset(
-                sample_folder_paths=[self.sample_folder_paths[i] for i in val_indices],
+            self.val_dataset = ViewOutDataset(
+                sample_folder_paths=self.val_sample_folder_paths,
                 with_transforms=False,
             )
 
         if stage == "test" or stage is None:
-            self.test_dataset = DHF1KDataset(
-                sample_folder_paths=[self.sample_folder_paths[i] for i in test_indices],
+            self.test_dataset = ViewOutDataset(
+                sample_folder_paths=self.val_sample_folder_paths,
                 with_transforms=False,
             )
 

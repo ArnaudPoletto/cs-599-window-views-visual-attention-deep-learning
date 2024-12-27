@@ -378,25 +378,25 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Process the salicon dataset.")
 
     parser.add_argument(
-        "--dispersion_threshold_px",
+        "--dispersion-threshold-px",
         type=int,
         default=DEFAULT_DISPERSION_THRESHOLD_PX,
         help="The dispersion threshold in pixels.",
     )
     parser.add_argument(
-        "--duration_threshold_ms",
+        "--duration-threshold-ms",
         type=int,
         default=DEFAULT_DURATION_THRESHOLD_MS,
         help="The duration threshold in milliseconds.",
     )
     parser.add_argument(
-        "--min_n_fixations",
+        "--min-n-fixations",
         type=int,
         default=DEFAULT_MIN_N_FIXATIONS,
         help="The minimum number of fixations required to generate a saliency map.",
     )
     parser.add_argument(
-        "--kde_bandwidth",
+        "--kde-bandwidth",
         type=float,
         default=DEFAULT_KDE_BANDWIDTH,
         help="The bandwidth for the kernel density estimation.",

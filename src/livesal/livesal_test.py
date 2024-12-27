@@ -15,6 +15,7 @@ from src.models.livesal import LiveSAL
 from src.utils.parser import get_config
 from src.utils.file import get_paths_recursive
 from src.datasets.dhf1k_dataset import DHF1KDataModule
+from src.datasets.viewout_dataset import ViewOutDataModule
 from src.datasets.salicon_dataset import SaliconDataModule
 from src.lightning_models.lightning_model import LightningModel
 from src.config import (
@@ -71,6 +72,13 @@ def _get_data_module(
             train_split=train_split,
             val_split=val_split,
             test_split=test_split,
+            with_transforms=with_transforms,
+            n_workers=N_WORKERS,
+            seed=SEED,
+        )
+    elif dataset == "viewout":
+        data_module = ViewOutDataModule(
+            batch_size=batch_size,
             with_transforms=with_transforms,
             n_workers=N_WORKERS,
             seed=SEED,
