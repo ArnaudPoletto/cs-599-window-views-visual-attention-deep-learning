@@ -21,7 +21,7 @@ output_type: "temporal"
 dropout_rate: 0.0
 with_graph_processing: True
 with_graph_edge_features: False
-with_graph_positional_embeddings: True
-with_graph_directional_kernels: False
+with_graph_positional_embeddings: False
+with_graph_directional_kernels: True
 with_depth_information: False
 with_checkpoint: False
