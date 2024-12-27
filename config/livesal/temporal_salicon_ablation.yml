@@ -20,7 +20,7 @@ depth_hidden_channels_list: [8, 16]
 output_type: "temporal"
 dropout_rate: 0.0
 with_graph_processing: True
-with_graph_edge_features: False
+with_graph_edge_features: True
 with_graph_positional_embeddings: False
 with_graph_directional_kernels: False
 with_depth_information: False
