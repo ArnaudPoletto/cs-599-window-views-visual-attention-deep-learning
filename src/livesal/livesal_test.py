@@ -148,6 +148,7 @@ def main() -> None:
     with_graph_positional_embeddings = bool(config["with_graph_positional_embeddings"])
     with_graph_directional_kernels = bool(config["with_graph_directional_kernels"])
     with_depth_information = bool(config["with_depth_information"])
+    depth_integration_type = str(config["depth_integration_type"])
     print(f"✅ Using config file at {Path(config_file_path).resolve()}")
 
     # Get dataset
@@ -178,6 +179,7 @@ def main() -> None:
         with_graph_positional_embeddings=with_graph_positional_embeddings,
         with_graph_directional_kernels=with_graph_directional_kernels,
         with_depth_information=with_depth_information,
+        depth_integration_type=depth_integration_type,
     )
 
     if not os.path.exists(checkpoint_file_path):
