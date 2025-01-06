@@ -359,9 +359,6 @@ class LiveSAL(nn.Module):
         if self.with_depth_information and self.depth_integration_type == "early":
             x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
             depth_estimation = self.depth_estimator(x_depth)
-            from matplotlib import pyplot as plt
-            plt.imshow(depth_estimation[0, 0].detach().cpu().numpy())
-            plt.show()
             x = torch.cat([x, depth_estimation], dim=1)
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
