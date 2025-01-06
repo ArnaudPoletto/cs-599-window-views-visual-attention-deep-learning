@@ -32,6 +32,11 @@ class DepthEstimator(nn.Module):
         output = self.depth_anything(x)
         predicted_depth = output.predicted_depth.unsqueeze(1)
 
+        # max min
+        min_depth = predicted_depth.min()
+        max_depth = predicted_depth.max()
+        predicted_depth = (predicted_depth - min_depth) / (max_depth - min_depth)
+
         # Reshape to original size
         predicted_depth = F.interpolate(predicted_depth, size=x.shape[-2:], mode="bilinear", align_corners=False)
 
