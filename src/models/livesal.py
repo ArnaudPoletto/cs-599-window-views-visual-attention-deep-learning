@@ -357,9 +357,17 @@ class LiveSAL(nn.Module):
         is_image: bool,
     ):
         if self.with_depth_information and self.depth_integration_type == "early":
-            x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
-            depth_estimation = self.depth_estimator(x_depth)
-            x = torch.cat([x, depth_estimation], dim=1)
+            if is_image:
+                x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
+                depth_estimation = self.depth_estimator(x_depth)
+                x = torch.cat([x, depth_estimation], dim=1)
+            else:
+                batch_size, sequence_length, channels, height, width = x.shape
+                x_flat = x.view(-1, channels, height, width)
+                x_depth = self._normalize_input(x_flat, self.depth_mean, self.depth_std)
+                depth_estimation = self.depth_estimator(x_depth)
+                depth_estimation = depth_estimation.view(batch_size, sequence_length, 1, height, width)
+                x = torch.cat([x, depth_estimation], dim=2)
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
 
