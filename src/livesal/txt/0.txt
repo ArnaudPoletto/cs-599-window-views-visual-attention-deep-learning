@@ -1,0 +1,1453 @@
+FeatureHookNet(
+  (body): PNASNet5Large(
+    (conv_0): ConvNormAct(
+      (conv): Conv2d(3, 96, kernel_size=(3, 3), stride=(2, 2), bias=False)
+      (bn): BatchNormAct2d(
+        96, eps=0.001, momentum=0.1, affine=True, track_running_stats=True
+        (drop): Identity()
+        (act): Identity()
+      )
+    )
+    (cell_stem_0): CellStem0(
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(96, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(96, 96, kernel_size=(5, 5), stride=(2, 2), groups=96, bias=False)
+          (pointwise_conv2d): Conv2d(96, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(54, 54, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): Sequential(
+        (max_pool): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+        (conv): Conv2d(96, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(54, 54, kernel_size=(7, 7), stride=(2, 2), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(54, 54, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(54, 54, kernel_size=(5, 5), stride=(2, 2), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(54, 54, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(54, 54, kernel_size=(3, 3), stride=(2, 2), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(54, 54, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(54, 54, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(54, 54, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(96, 96, kernel_size=(3, 3), stride=(2, 2), groups=96, bias=False)
+          (pointwise_conv2d): Conv2d(96, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(54, 54, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=54, bias=False)
+          (pointwise_conv2d): Conv2d(54, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_4_right): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2dSame(54, 54, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): BatchNorm2d(54, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_stem_1): Cell(
+      (conv_prev_1x1): FactorizedReduction(
+        (act): ReLU()
+        (path_1): Sequential(
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(96, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (path_2): Sequential(
+          (pad): ZeroPad2d((-1, 1, -1, 1))
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(96, 54, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (final_path_bn): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(270, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(108, 108, kernel_size=(5, 5), stride=(2, 2), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(108, 108, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(108, 108, kernel_size=(7, 7), stride=(2, 2), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(108, 108, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(108, 108, kernel_size=(5, 5), stride=(2, 2), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(108, 108, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(108, 108, kernel_size=(3, 3), stride=(2, 2), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(108, 108, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(108, 108, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(108, 108, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(108, 108, kernel_size=(3, 3), stride=(2, 2), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(108, 108, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=108, bias=False)
+          (pointwise_conv2d): Conv2d(108, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_4_right): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2dSame(108, 108, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): BatchNorm2d(108, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_0): Cell(
+      (conv_prev_1x1): FactorizedReduction(
+        (act): ReLU()
+        (path_1): Sequential(
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(270, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (path_2): Sequential(
+          (pad): ZeroPad2d((-1, 1, -1, 1))
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(270, 108, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (final_path_bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(540, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_1): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(540, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(1080, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_2): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(1080, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(1080, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_3): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(1080, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(1080, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(216, 216, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=216, bias=False)
+          (pointwise_conv2d): Conv2d(216, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(216, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_4): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(1080, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(1080, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(432, 432, kernel_size=(5, 5), stride=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(432, 432, kernel_size=(7, 7), stride=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(432, 432, kernel_size=(5, 5), stride=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(432, 432, kernel_size=(3, 3), stride=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(432, 432, kernel_size=(3, 3), stride=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_4_right): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2dSame(432, 432, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_5): Cell(
+      (conv_prev_1x1): FactorizedReduction(
+        (act): ReLU()
+        (path_1): Sequential(
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(1080, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (path_2): Sequential(
+          (pad): ZeroPad2d((-1, 1, -1, 1))
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(1080, 216, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (final_path_bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(2160, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_6): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(2160, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(2160, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_7): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(2160, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(2160, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432, bias=False)
+          (pointwise_conv2d): Conv2d(432, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(432, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_8): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(2160, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(2160, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(864, 864, kernel_size=(5, 5), stride=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(864, 864, kernel_size=(7, 7), stride=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(864, 864, kernel_size=(5, 5), stride=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(864, 864, kernel_size=(3, 3), stride=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2dSame(kernel_size=(3, 3), stride=(2, 2), padding=(0, 0), dilation=(1, 1), ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2dSame(864, 864, kernel_size=(3, 3), stride=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_4_right): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2dSame(864, 864, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_9): Cell(
+      (conv_prev_1x1): FactorizedReduction(
+        (act): ReLU()
+        (path_1): Sequential(
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(2160, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (path_2): Sequential(
+          (pad): ZeroPad2d((-1, 1, -1, 1))
+          (avgpool): AvgPool2d(kernel_size=1, stride=2, padding=0)
+          (conv): Conv2d(2160, 432, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (final_path_bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(4320, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_10): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(4320, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(4320, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (cell_11): Cell(
+      (conv_prev_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(4320, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (conv_1x1): ActConvBn(
+        (act): ReLU()
+        (conv): Conv2d(4320, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_0_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_1_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_1_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_2_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_2_right): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (comb_iter_3_right): MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+      (comb_iter_4_left): BranchSeparables(
+        (act_1): ReLU()
+        (separable_1): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_1): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        (act_2): ReLU()
+        (separable_2): SeparableConv2d(
+          (depthwise_conv2d): Conv2d(864, 864, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=864, bias=False)
+          (pointwise_conv2d): Conv2d(864, 864, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (bn_sep_2): BatchNorm2d(864, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (act): ReLU()
+    (global_pool): SelectAdaptivePool2d(pool_type=avg, flatten=Flatten(start_dim=1, end_dim=-1))
+    (head_drop): Dropout(p=0.0, inplace=False)
+    (last_linear): Identity()
+  )
+)

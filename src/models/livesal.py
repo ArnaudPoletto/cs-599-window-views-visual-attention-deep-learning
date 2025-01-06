@@ -30,6 +30,7 @@ class LiveSAL(nn.Module):
         with_graph_positional_embeddings: bool,
         with_graph_directional_kernels: bool,
         with_depth_information: bool,
+        depth_integration_type: str,
         eps: float = 1e-6,
     ) -> None:
         if image_n_levels < 1:
@@ -61,6 +62,7 @@ class LiveSAL(nn.Module):
         self.with_graph_positional_embeddings = with_graph_positional_embeddings
         self.with_graph_directional_kernels = with_graph_directional_kernels
         self.with_depth_information = with_depth_information
+        self.depth_integration_type = depth_integration_type
         self.output_type = output_type
         self.eps = eps
 
@@ -89,33 +91,50 @@ class LiveSAL(nn.Module):
 
         if with_depth_information:
             self.depth_estimator = DepthEstimator(freeze=True)
-            self.depth_encoder = DepthEncoder(
-                hidden_channels=hidden_channels,
-            )
-            depth_last_layer_channels = self.depth_encoder.features_channels_list[-1]
-            depth_last_layer_size = self.depth_encoder.features_sizes[-1]
-            self.depth_graph_processor = GraphProcessor(
-                channels=depth_last_layer_channels,
-                size=depth_last_layer_size,
-                neighbor_radius=neighbor_radius,
-                n_iterations=n_iterations,
-                dropout_rate=dropout_rate,
-                with_edge_features=with_graph_edge_features,
-                with_positional_embeddings=with_graph_positional_embeddings,
-                with_directional_kernels=with_graph_directional_kernels,
-            )
-            self.depth_decoder = DepthDecoder(
-                features_channels_list=self.depth_encoder.features_channels_list,
-                hidden_channels_list=depth_hidden_channels_list,
-                features_sizes=self.depth_encoder.features_sizes,
-                output_channels=hidden_channels,
-                dropout_rate=dropout_rate,
-            )
+            if self.depth_integration_type == "late":
+                self.depth_encoder = DepthEncoder(
+                    hidden_channels=hidden_channels,
+                )
+                depth_last_layer_channels = self.depth_encoder.features_channels_list[-1]
+                depth_last_layer_size = self.depth_encoder.features_sizes[-1]
+                self.depth_graph_processor = GraphProcessor(
+                    channels=depth_last_layer_channels,
+                    size=depth_last_layer_size,
+                    neighbor_radius=neighbor_radius,
+                    n_iterations=n_iterations,
+                    dropout_rate=dropout_rate,
+                    with_edge_features=with_graph_edge_features,
+                    with_positional_embeddings=with_graph_positional_embeddings,
+                    with_directional_kernels=with_graph_directional_kernels,
+                )
+                self.depth_decoder = DepthDecoder(
+                    features_channels_list=self.depth_encoder.features_channels_list,
+                    hidden_channels_list=depth_hidden_channels_list,
+                    features_sizes=self.depth_encoder.features_sizes,
+                    output_channels=hidden_channels,
+                    dropout_rate=dropout_rate,
+                )
 
         self.image_encoder = ImageEncoder(
             freeze=freeze_encoder or freeze_temporal_pipeline,
             n_levels=image_n_levels,
         )
+        if self.with_depth_information and self.depth_integration_type == "early":
+            # Change first kernel size to 4 to account for the depth information
+            first_conv = self.image_encoder.pnas.body.conv_0.conv
+            new_first_conv = nn.Conv2d(
+                in_channels=4,
+                out_channels=first_conv.out_channels,
+                kernel_size=first_conv.kernel_size,
+                stride=first_conv.stride,
+                padding=first_conv.padding,
+                bias=first_conv.bias is not None,
+            )
+            new_first_conv.weight.data[:, :3] = first_conv.weight.data
+            new_first_conv.weight.data[:, 3] = 0.0
+            if first_conv.bias is not None:
+                new_first_conv.bias.data = first_conv.bias.data
+            self.image_encoder.pnas.body.conv_0.conv = new_first_conv
 
         projection_in_channels_list = self.image_encoder.feature_channels_list
         self.projection_layers = nn.ModuleList([
@@ -157,7 +176,7 @@ class LiveSAL(nn.Module):
             )
 
         depth_channels = None
-        if with_depth_information:
+        if with_depth_information and self.depth_integration_type == "late":
             depth_channels = self.depth_encoder.features_channels_list[-1]
         self.temporal_decoder = LiveSALDecoder(
             features_channels_list=projection_channels_list,
@@ -166,6 +185,7 @@ class LiveSAL(nn.Module):
             output_channels=1,
             dropout_rate=dropout_rate,
             with_depth_information=with_depth_information,
+            depth_integration_type=depth_integration_type,
             use_pooled_features=False,
         )
 
@@ -176,6 +196,7 @@ class LiveSAL(nn.Module):
             output_channels=1,
             dropout_rate=dropout_rate,
             with_depth_information=with_depth_information,
+            depth_integration_type=depth_integration_type,
             use_pooled_features=True,
         )
 
@@ -191,10 +212,11 @@ class LiveSAL(nn.Module):
             if with_depth_information:
                     for param in self.depth_encoder.parameters():
                         param.requires_grad = False
-                    for param in self.depth_graph_processor.parameters():
-                        param.requires_grad = False
-                    for param in self.depth_decoder.parameters():
-                        param.requires_grad = False
+                    if self.depth_integration_type == "late":
+                        for param in self.depth_graph_processor.parameters():
+                            param.requires_grad = False
+                        for param in self.depth_decoder.parameters():
+                            param.requires_grad = False
             if with_graph_processing:
                 for param in self.image_graph_processor.parameters():
                     param.requires_grad = False
@@ -253,7 +275,11 @@ class LiveSAL(nn.Module):
             x = x.view(-1, channels, height, width)
 
         # Normalize and get image features
-        x_image = self._normalize_input(x, self.image_mean, self.image_std)
+        if self.with_depth_information and self.depth_integration_type == "early":
+            x_image = self._normalize_input(x[:, :3], self.image_mean, self.image_std)
+            x_image = torch.cat([x_image, x[:, 3:]], dim=1)
+        else:
+            x_image = self._normalize_input(x, self.image_mean, self.image_std)
         image_features_list = self.image_encoder(x_image)
 
         # Project features
@@ -330,6 +356,13 @@ class LiveSAL(nn.Module):
         x: torch.Tensor,
         is_image: bool,
     ):
+        if self.with_depth_information and self.depth_integration_type == "early":
+            x_depth = self._normalize_input(x, self.depth_mean, self.depth_std)
+            depth_estimation = self.depth_estimator(x_depth)
+            from matplotlib import pyplot as plt
+            plt.imshow(depth_estimation[0, 0].detach().cpu().numpy())
+            plt.show()
+            x = torch.cat([x, depth_estimation], dim=1)
         # Get image features
         image_features_list = self._get_image_features_list(x, is_image)
 
@@ -340,7 +373,7 @@ class LiveSAL(nn.Module):
                 graph_processor=self.image_graph_processor,
             )
 
-        if self.with_depth_information:
+        if self.with_depth_information and self.depth_integration_type == "late":
             depth_encoded_features_list = self._get_depth_features_list(x, is_image)
             if self.with_graph_processing:
                 depth_encoded_features_list[-1] = self._get_graph_features(
@@ -393,7 +426,7 @@ class LiveSAL(nn.Module):
                 graph_processor=self.image_graph_processor,
             )
 
-        if self.with_depth_information:
+        if self.with_depth_information and self.depth_integration_type == "late":
             depth_encoded_features_list = self._get_depth_features_list(x, is_image)
             if self.with_graph_processing:
                 depth_encoded_features_list[-1] = self._get_graph_features(

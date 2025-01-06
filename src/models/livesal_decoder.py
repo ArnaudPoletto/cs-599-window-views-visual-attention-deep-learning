@@ -13,9 +13,10 @@ class LiveSALDecoder(nn.Module):
         output_channels: int,
         dropout_rate: float,
         with_depth_information: bool,
+        depth_integration_type: str,
         use_pooled_features: bool,
     ) -> None:
-        if depth_channels is None and with_depth_information:
+        if depth_channels is None and with_depth_information and depth_integration_type == "late":
             raise ValueError(
                 "❌ You must provide the number of depth channels if you want to use depth information."
             )
@@ -28,6 +29,7 @@ class LiveSALDecoder(nn.Module):
         self.output_channels = output_channels
         self.dropout_rate = dropout_rate
         self.with_depth_information = with_depth_information
+        self.depth_integration_type = depth_integration_type
         self.use_pooled_features = use_pooled_features
 
         in_channels_list = [features_channels_list[-1]] + hidden_channels_list[1:][::-1]
@@ -58,7 +60,7 @@ class LiveSALDecoder(nn.Module):
 
         # Get the final layer
         in_final_channels = out_channels_list[-1]
-        if with_depth_information:
+        if with_depth_information and depth_integration_type == "late":
             in_final_channels += depth_channels
         out_final_channels = out_channels_list[-1]
         self.final_layer = nn.Sequential(
@@ -112,7 +114,7 @@ class LiveSALDecoder(nn.Module):
         output = nn.functional.interpolate(
             x, size=(IMAGE_SIZE, IMAGE_SIZE), mode="bilinear", align_corners=False
         )
-        if self.with_depth_information:
+        if self.with_depth_information and self.depth_integration_type == "late":
             output = torch.cat([output, depth_decoded_features], dim=1)
         output = self.final_layer(output)
 
